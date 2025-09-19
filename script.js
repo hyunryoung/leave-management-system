@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         return;
     }
     
-    loadData();
+    await loadData(); // Firebase에서 데이터 우선 로드
     updateCurrentTime();
     setInterval(updateCurrentTime, 1000); // 매초 시간 업데이트
     renderCalendar();
@@ -761,20 +761,66 @@ function updateStats() {
 }
 
 // 데이터 저장
-function saveData() {
+async function saveData() {
+    // 로컬 백업
     localStorage.setItem('employees', JSON.stringify(employees));
     localStorage.setItem('leaveRecords', JSON.stringify(leaveRecords));
     localStorage.setItem('lastUpdate', Date.now().toString());
+    
+    // Firebase에 메인 데이터 저장 (실시간 동기화)
+    if (isFirebaseEnabled) {
+        try {
+            await database.ref('employees').set(employees);
+            await database.ref('leaveRecords').set(leaveRecords);
+            await database.ref('lastUpdate').set(Date.now());
+            console.log('Firebase에 데이터 저장 완료');
+        } catch (error) {
+            console.log('Firebase 저장 실패:', error);
+        }
+    }
 }
 
 // 데이터 불러오기
-function loadData() {
+async function loadData() {
+    // Firebase에서 우선 로드 시도
+    if (isFirebaseEnabled) {
+        try {
+            const [employeesSnapshot, recordsSnapshot] = await Promise.all([
+                database.ref('employees').once('value'),
+                database.ref('leaveRecords').once('value')
+            ]);
+            
+            const firebaseEmployees = employeesSnapshot.val();
+            const firebaseRecords = recordsSnapshot.val();
+            
+            if (firebaseEmployees) {
+                employees = firebaseEmployees;
+                employees.forEach(emp => calculateEmployeeLeaves(emp));
+                console.log('Firebase에서 직원 데이터 로드 완료');
+            }
+            
+            if (firebaseRecords) {
+                leaveRecords = firebaseRecords;
+                console.log('Firebase에서 휴가 데이터 로드 완료');
+            }
+            
+            // Firebase 데이터를 로컬에도 백업
+            if (firebaseEmployees) localStorage.setItem('employees', JSON.stringify(employees));
+            if (firebaseRecords) localStorage.setItem('leaveRecords', JSON.stringify(leaveRecords));
+            
+            return; // Firebase 로드 성공하면 로컬 로드 생략
+            
+        } catch (error) {
+            console.log('Firebase 로드 실패, 로컬 데이터 사용:', error);
+        }
+    }
+    
+    // Firebase 실패 시 로컬 데이터 사용
     const savedEmployees = localStorage.getItem('employees');
     const savedRecords = localStorage.getItem('leaveRecords');
     
     if (savedEmployees) {
         employees = JSON.parse(savedEmployees);
-        // 로드 시 연차/월차 재계산
         employees.forEach(emp => calculateEmployeeLeaves(emp));
     }
     
@@ -1141,7 +1187,7 @@ async function attemptTokenAuthentication() {
         document.getElementById('tokenAuthModal').remove();
         
         // 메인 앱 시작
-        initializeApp();
+        await initializeApp();
         
         alert(`인증되었습니다. ${tokenInfo.name}님, 휴가 관리 시스템에 오신 것을 환영합니다!`);
     } else {
@@ -1182,8 +1228,8 @@ function setupUIPermissions() {
 }
 
 // 메인 앱 초기화
-function initializeApp() {
-    loadData();
+async function initializeApp() {
+    await loadData(); // Firebase에서 데이터 로드
     updateCurrentTime();
     setInterval(updateCurrentTime, 1000);
     renderCalendar();
