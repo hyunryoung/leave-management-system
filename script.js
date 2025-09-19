@@ -253,16 +253,22 @@ function calculateEmployeeLeaves(employee) {
         if (!employee.lastAnnualReset) {
             employee.lastAnnualReset = currentCycleStart.toISOString().split('T')[0];
             employee.annualLeave = 15;
-            // usedAnnual은 이미 초기화되었으므로 유지
+            // 최초 설정이므로 usedAnnual은 그대로 유지 (이미 0으로 초기화됨)
         } else {
             const lastReset = new Date(employee.lastAnnualReset);
-            if (currentCycleStart > lastReset) {
-                // 새로운 연차 주기 시작 - 리셋 (사용량만 초기화)
-                employee.lastAnnualReset = currentCycleStart.toISOString().split('T')[0];
+            const lastResetStr = employee.lastAnnualReset;
+            const currentCycleStr = currentCycleStart.toISOString().split('T')[0];
+            
+            // 정확히 1년이 지났을 때만 리셋 (날짜 비교)
+            if (currentCycleStr !== lastResetStr && currentCycleStart > lastReset) {
+                console.log(`${employee.name} 연차 주기 리셋: ${lastResetStr} → ${currentCycleStr}`);
+                employee.lastAnnualReset = currentCycleStr;
                 employee.annualLeave = 15;
                 employee.usedAnnual = 0; // 새 연차 주기에만 리셋
+            } else {
+                // 같은 연차 주기 내에서는 절대 usedAnnual 건드리지 않음
+                console.log(`${employee.name} 연차 주기 유지: ${lastResetStr}, 사용량: ${employee.usedAnnual}`);
             }
-            // 같은 연차 주기 내에서는 usedAnnual 보존
         }
     }
 }
