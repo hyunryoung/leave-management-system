@@ -482,21 +482,165 @@ h1 {
     margin: 5px 0;
 }
 
-/* 반응형 디자인 */
+/* 모바일 최적화 반응형 디자인 */
 @media (max-width: 768px) {
-    .main-content {
-        grid-template-columns: 1fr;
+    body {
+        padding: 10px;
     }
     
-    .leave-form {
-        grid-template-columns: 1fr;
+    .container {
+        border-radius: 10px;
+    }
+    
+    header {
+        padding: 15px;
+        flex-direction: column;
+        gap: 10px;
     }
     
     h1 {
-        font-size: 1.5rem;
+        font-size: 1.3rem;
+        text-align: center;
     }
     
     .current-time {
-        font-size: 1rem;
+        font-size: 0.9rem;
+        padding: 8px 15px;
+    }
+    
+    .main-content {
+        grid-template-columns: 1fr;
+        gap: 20px;
+        padding: 15px;
+    }
+    
+    /* 달력 모바일 최적화 */
+    .calendar {
+        gap: 2px;
+    }
+    
+    .calendar-day {
+        min-height: 60px;
+        padding: 4px;
+        font-size: 12px;
+    }
+    
+    .day-number {
+        font-size: 14px;
+        margin-bottom: 3px;
+    }
+    
+    .leave-indicator {
+        font-size: 9px;
+        padding: 1px 3px;
+        margin-top: 1px;
+        display: block;
+        width: 100%;
+        text-align: center;
+    }
+    
+    .holiday-indicator {
+        font-size: 8px;
+        padding: 1px 2px;
+    }
+    
+    /* 직원 카드 모바일 최적화 */
+    .employee-card {
+        padding: 12px;
+    }
+    
+    .employee-name {
+        font-size: 14px;
+    }
+    
+    .employee-info {
+        font-size: 11px;
+    }
+    
+    .leave-summary {
+        grid-template-columns: 1fr;
+        gap: 3px;
+    }
+    
+    .leave-item {
+        font-size: 11px;
+        padding: 4px 6px;
+    }
+    
+    /* 모달 모바일 최적화 */
+    .modal-content {
+        margin: 5% auto;
+        padding: 20px;
+        width: 95%;
+        max-width: none;
+        border-radius: 10px;
+    }
+    
+    .modal h3 {
+        font-size: 1.2rem;
+        margin-bottom: 15px;
+    }
+    
+    .form-group input,
+    .form-group select {
+        padding: 12px;
+        font-size: 16px; /* iOS 줌 방지 */
+    }
+    
+    .modal-buttons {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .modal-buttons button {
+        padding: 12px 20px;
+        font-size: 16px;
+        width: 100%;
+    }
+    
+    /* 버튼 터치 최적화 */
+    .add-employee button,
+    .calendar-controls button {
+        padding: 12px 20px;
+        font-size: 16px;
+        min-height: 44px; /* 터치 최적화 */
+    }
+    
+    .delete-employee {
+        padding: 6px 10px;
+        font-size: 12px;
+        min-height: 32px;
+    }
+    
+    /* 달력 컨트롤 모바일 최적화 */
+    .calendar-controls {
+        margin-bottom: 15px;
+    }
+    
+    .calendar-controls button {
+        padding: 10px 15px;
+        font-size: 16px;
+    }
+    
+    #currentMonth {
+        font-size: 16px;
+    }
+    
+    .selected-info {
+        padding: 8px;
+        font-size: 12px;
+        margin-bottom: 10px;
+    }
+    
+    /* 직원 요약 모바일 최적화 */
+    .employee-summary {
+        max-height: 300px;
+    }
+    
+    /* 터치 피드백 개선 */
+    .calendar-day:active,
+    .employee-card:active,
+    .leave-indicator:active {
+        transform: scale(0.95);
     }
 }
