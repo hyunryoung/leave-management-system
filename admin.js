@@ -142,9 +142,18 @@ function updateMainSystemTokens() {
         }
     });
     
-    // 두 곳 모두에 저장해서 확실히 동기화
+    // 여러 곳에 저장해서 확실히 동기화
     localStorage.setItem('activeTokens', JSON.stringify(activeTokens));
     localStorage.setItem('adminGeneratedTokens', JSON.stringify(activeTokens));
+    localStorage.setItem('tokenDatabase', JSON.stringify(tokenDatabase));
+    
+    // 즉시 적용을 위해 전역 변수도 업데이트 (메인 시스템에서 사용)
+    if (typeof window.ACCESS_TOKENS !== 'undefined') {
+        window.ACCESS_TOKENS = { ...window.ACCESS_TOKENS, ...activeTokens };
+    }
+    
+    // 메인 시스템에 토큰 업데이트 신호 보내기
+    localStorage.setItem('tokenUpdateSignal', Date.now().toString());
     
     console.log('토큰 동기화 완료:', Object.keys(activeTokens));
 }

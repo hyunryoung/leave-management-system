@@ -1174,7 +1174,6 @@ function startRealTimeSync() {
 function syncWithOtherUsers() {
     // localStorage에 마지막 업데이트 시간 저장
     const lastUpdate = localStorage.getItem('lastUpdate') || '0';
-    const currentTime = Date.now().toString();
     
     // 다른 창에서 업데이트가 있었는지 확인
     const otherUpdate = localStorage.getItem('lastUpdate');
@@ -1184,6 +1183,17 @@ function syncWithOtherUsers() {
         renderCalendar();
         renderEmployeeSummary();
         updateModalEmployeeDropdown();
+    }
+    
+    // 토큰 업데이트 신호 확인
+    const tokenUpdateSignal = localStorage.getItem('tokenUpdateSignal');
+    const lastTokenUpdate = sessionStorage.getItem('lastTokenUpdate') || '0';
+    
+    if (tokenUpdateSignal && tokenUpdateSignal !== lastTokenUpdate) {
+        // 토큰 목록 다시 로드
+        loadActiveTokens();
+        sessionStorage.setItem('lastTokenUpdate', tokenUpdateSignal);
+        console.log('토큰 목록이 업데이트되었습니다.');
     }
 }
 
