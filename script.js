@@ -795,8 +795,13 @@ async function saveEmployee(employee) {
 async function saveLeaveRecord(leaveRecord) {
     if (isFirebaseEnabled) {
         try {
-            await database.ref(`leaveRecords/${leaveRecord.id}`).set(leaveRecord);
-            console.log('Firebase에 휴가 기록 저장 완료');
+            // ID에 소수점이 있으면 변환
+            let safeId = leaveRecord.id.toString().replace(/\./g, '_');
+            await database.ref(`leaveRecords/${safeId}`).set({
+                ...leaveRecord,
+                id: safeId // 안전한 ID로 업데이트
+            });
+            console.log('Firebase에 휴가 기록 저장 완료:', safeId);
         } catch (error) {
             console.log('Firebase 휴가 저장 실패:', error);
         }
@@ -815,8 +820,46 @@ async function deleteLeaveRecord(leaveId) {
     }
 }
 
+// 기존 잘못된 휴가 기록 정리
+async function cleanupInvalidLeaveRecords() {
+    if (!isFirebaseEnabled) return;
+    
+    try {
+        // 소수점이 포함된 ID를 가진 기록들 찾기
+        const invalidRecords = leaveRecords.filter(record => 
+            record.id.toString().includes('.')
+        );
+        
+        if (invalidRecords.length > 0) {
+            console.log('잘못된 휴가 기록 정리 중:', invalidRecords.length + '개');
+            
+            // 잘못된 기록들을 올바른 ID로 다시 저장
+            for (let i = 0; i < invalidRecords.length; i++) {
+                const record = invalidRecords[i];
+                const newId = `${Date.now()}_cleanup_${i}`;
+                
+                // 새 ID로 업데이트
+                record.id = newId;
+                
+                // 배열에서도 업데이트
+                const index = leaveRecords.findIndex(r => r.id.toString().includes('.'));
+                if (index >= 0) {
+                    leaveRecords[index] = record;
+                }
+            }
+            
+            console.log('휴가 기록 정리 완료');
+        }
+    } catch (error) {
+        console.log('휴가 기록 정리 실패:', error);
+    }
+}
+
 // 데이터 저장 (기존 + 개별 저장)
 async function saveData() {
+    // 기존 잘못된 데이터 정리
+    await cleanupInvalidLeaveRecords();
+    
     // 로컬 백업
     localStorage.setItem('employees', JSON.stringify(employees));
     localStorage.setItem('leaveRecords', JSON.stringify(leaveRecords));
@@ -1348,21 +1391,14 @@ function subscribeRealtimeData() {
             // 객체를 배열로 변환 (개별 저장된 데이터)
             const newEmployees = Object.values(firebaseEmployees);
             
-            // 기존 데이터와 병합 (덮어쓰기 방지)
-            newEmployees.forEach(newEmp => {
-                const existingIndex = employees.findIndex(emp => emp.id === newEmp.id);
-                if (existingIndex >= 0) {
-                    employees[existingIndex] = newEmp;
-                } else {
-                    employees.push(newEmp);
-                }
-            });
+            // 완전히 교체 (중복 방지)
+            employees = [...newEmployees];
             
             employees.forEach(emp => calculateEmployeeLeaves(emp));
             renderEmployeeSummary();
             updateModalEmployeeDropdown();
             renderCalendar();
-            console.log('🔥 직원 데이터 실시간 업데이트 (충돌 방지)');
+            console.log('🔥 직원 데이터 실시간 업데이트 (중복 방지)');
         }
     });
 
@@ -1373,19 +1409,12 @@ function subscribeRealtimeData() {
             // 객체를 배열로 변환 (개별 저장된 데이터)
             const newRecords = Object.values(firebaseRecords);
             
-            // 기존 데이터와 병합 (덮어쓰기 방지)
-            newRecords.forEach(newRecord => {
-                const existingIndex = leaveRecords.findIndex(record => record.id === newRecord.id);
-                if (existingIndex >= 0) {
-                    leaveRecords[existingIndex] = newRecord;
-                } else {
-                    leaveRecords.push(newRecord);
-                }
-            });
+            // 완전히 교체 (중복 방지)
+            leaveRecords = [...newRecords];
             
             renderEmployeeSummary();
             renderCalendar();
-            console.log('🔥 휴가 데이터 실시간 업데이트 (충돌 방지)');
+            console.log('🔥 휴가 데이터 실시간 업데이트 (중복 방지)');
         }
     });
 }
