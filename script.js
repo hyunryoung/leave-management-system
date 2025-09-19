@@ -514,26 +514,33 @@ async function renderCalendar() {
         day.innerHTML = leaveHTML;
         day.dataset.date = currentDateStr;
         
-        // 모든 날짜에 이벤트 추가 (휴가 있어도 추가 등록 가능)
-        day.addEventListener('mousedown', handleDateMouseDown);
-        day.addEventListener('mouseover', handleDateMouseOver);
-        day.addEventListener('mouseup', handleDateMouseUp);
-        
-        // 전체 날짜 칸 클릭 이벤트 (휴가 등록용)
-        day.addEventListener('click', (e) => {
-            console.log('날짜 클릭:', currentDateStr, '타겟:', e.target.className);
+        // 매니저 이상만 달력 조작 가능
+        if (checkPermission('manager')) {
+            // 매니저/관리자: 모든 날짜에 이벤트 추가
+            day.addEventListener('mousedown', handleDateMouseDown);
+            day.addEventListener('mouseover', handleDateMouseOver);
+            day.addEventListener('mouseup', handleDateMouseUp);
             
-            // 휴가 표시를 클릭한 경우가 아니면 휴가 등록 모달 열기
-            if (!e.target.classList.contains('leave-indicator')) {
-                console.log('휴가 등록 모달 열기:', currentDateStr);
-                selectedDates = [currentDateStr];
-                updateSelectedDatesDisplay();
-                updateCalendarSelection();
-                openLeaveModal();
-            } else {
-                console.log('휴가 표시 클릭됨, 등록 모달 열지 않음');
-            }
-        });
+            // 전체 날짜 칸 클릭 이벤트 (휴가 등록용)
+            day.addEventListener('click', (e) => {
+                console.log('날짜 클릭:', currentDateStr, '타겟:', e.target.className);
+                
+                // 휴가 표시를 클릭한 경우가 아니면 휴가 등록 모달 열기
+                if (!e.target.classList.contains('leave-indicator')) {
+                    console.log('휴가 등록 모달 열기:', currentDateStr);
+                    selectedDates = [currentDateStr];
+                    updateSelectedDatesDisplay();
+                    updateCalendarSelection();
+                    openLeaveModal();
+                } else {
+                    console.log('휴가 표시 클릭됨, 등록 모달 열지 않음');
+                }
+            });
+        } else {
+            // 일반 직원: 조회만 가능 (클릭 비활성화)
+            day.style.cursor = 'default';
+            day.title = '휴가 신청은 관리자에게 구두로 요청하세요';
+        }
         
         calendar.appendChild(day);
     }
@@ -698,17 +705,10 @@ function closeLeaveModal() {
 
 // 휴가 등록
 function registerLeave() {
-    // 권한 체크: 매니저 이상만 가능 (또는 본인 휴가만)
-    const employeeId = parseInt(document.getElementById('modalEmployee').value);
-    const currentUserName = sessionStorage.getItem('userName') || localStorage.getItem('userName');
-    const selectedEmployee = employees.find(emp => emp.id === employeeId);
-    
-    // 본인 휴가가 아니면 매니저 이상 권한 필요
-    if (selectedEmployee && selectedEmployee.name !== currentUserName) {
-        if (!checkPermission('manager')) {
-            showNoPermissionAlert('다른 직원의 휴가 등록');
-            return;
-        }
+    // 권한 체크: 매니저 이상만 휴가 등록 가능 (일반 직원은 조회만)
+    if (!checkPermission('manager')) {
+        showNoPermissionAlert('휴가 등록 (구두로 관리자에게 신청하세요)');
+        return;
     }
     
     const leaveType = document.getElementById('modalLeaveType').value;
@@ -1199,6 +1199,13 @@ function closeLeaveCancelModal() {
 
 // 휴가 취소 확인
 async function confirmCancelLeave() {
+    // 권한 체크: 매니저 이상만 휴가 취소 가능
+    if (!checkPermission('manager')) {
+        showNoPermissionAlert('휴가 취소 (관리자에게 문의하세요)');
+        closeLeaveCancelModal();
+        return;
+    }
+    
     const modal = document.getElementById('leaveCancelModal');
     const leaveId = modal.dataset.leaveId; // 문자열 ID 사용
     
@@ -1209,16 +1216,6 @@ async function confirmCancelLeave() {
     
     const leave = leaveRecords[leaveIndex];
     const employee = employees.find(emp => emp.id === leave.employeeId);
-    const currentUserName = sessionStorage.getItem('userName') || localStorage.getItem('userName');
-    
-    // 본인 휴가가 아니면 매니저 이상 권한 필요
-    if (employee && employee.name !== currentUserName) {
-        if (!checkPermission('manager')) {
-            showNoPermissionAlert('다른 직원의 휴가 취소');
-            closeLeaveCancelModal();
-            return;
-        }
-    }
     
     if (employee) {
         // 휴가 복구
@@ -1519,11 +1516,32 @@ function setupUIPermissions() {
         }
     }
     
+    // 일반 직원용 안내 메시지 추가
+    if (userRole === 'user') {
+        const calendarSection = document.querySelector('.calendar-section h2');
+        if (calendarSection) {
+            calendarSection.innerHTML = `
+                휴가 달력 (조회 전용)
+                <div style="font-size: 12px; color: #666; font-weight: normal; margin-top: 5px;">
+                    💡 휴가 신청은 관리자에게 구두로 요청하세요
+                </div>
+            `;
+        }
+        
+        // 선택 정보도 비활성화
+        const selectedInfo = document.getElementById('selectedInfo');
+        if (selectedInfo) {
+            selectedInfo.textContent = '휴가 현황 조회 전용 - 신청은 관리자에게 문의하세요';
+            selectedInfo.style.background = '#f8f9fa';
+            selectedInfo.style.color = '#666';
+        }
+    }
+    
     // 사용자 정보 표시
     const header = document.querySelector('header h1');
     if (header && userName) {
         const roleText = userRole === 'admin' ? '관리자' : 
-                        userRole === 'manager' ? '매니저' : '사용자';
+                        userRole === 'manager' ? '매니저' : '사용자 (조회 전용)';
         header.textContent = `휴가 관리 시스템 - ${userName} (${roleText})`;
     }
 }
