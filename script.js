@@ -210,6 +210,10 @@ function calculateEmployeeLeaves(employee) {
     const today = new Date();
     const joinDate = new Date(employee.joinDate);
     
+    // 사용량 속성 초기화 (누락된 경우)
+    if (typeof employee.usedAnnual === 'undefined') employee.usedAnnual = 0;
+    if (typeof employee.usedMonthly === 'undefined') employee.usedMonthly = 0;
+    
     // 근무일수 계산
     const daysDiff = Math.floor((today - joinDate) / (1000 * 60 * 60 * 24));
     const yearsOfService = Math.floor(daysDiff / 365);
@@ -246,15 +250,16 @@ function calculateEmployeeLeaves(employee) {
         if (!employee.lastAnnualReset) {
             employee.lastAnnualReset = currentCycleStart.toISOString().split('T')[0];
             employee.annualLeave = 15;
-            employee.usedAnnual = 0;
+            // usedAnnual은 이미 초기화되었으므로 유지
         } else {
             const lastReset = new Date(employee.lastAnnualReset);
             if (currentCycleStart > lastReset) {
-                // 새로운 연차 주기 시작 - 리셋
+                // 새로운 연차 주기 시작 - 리셋 (사용량만 초기화)
                 employee.lastAnnualReset = currentCycleStart.toISOString().split('T')[0];
                 employee.annualLeave = 15;
-                employee.usedAnnual = 0;
+                employee.usedAnnual = 0; // 새 연차 주기에만 리셋
             }
+            // 같은 연차 주기 내에서는 usedAnnual 보존
         }
     }
 }
