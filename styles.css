@@ -485,11 +485,18 @@ h1 {
 /* 모바일 최적화 반응형 디자인 */
 @media (max-width: 768px) {
     body {
-        padding: 10px;
+        padding: 5px;
+        margin: 0;
+        min-height: 100vh;
+        overflow-x: hidden; /* 가로 스크롤 방지 */
     }
     
     .container {
-        border-radius: 10px;
+        border-radius: 8px;
+        margin: 0;
+        min-height: calc(100vh - 10px);
+        max-width: 100%;
+        overflow: hidden;
     }
     
     header {
@@ -516,13 +523,15 @@ h1 {
     
     /* 달력 모바일 최적화 */
     .calendar {
-        gap: 2px;
+        gap: 1px;
+        font-size: 12px;
     }
     
     .calendar-day {
-        min-height: 60px;
-        padding: 4px;
-        font-size: 12px;
+        min-height: 50px;
+        padding: 2px;
+        font-size: 11px;
+        overflow: hidden;
     }
     
     .day-number {
@@ -642,5 +651,71 @@ h1 {
     .employee-card:active,
     .leave-indicator:active {
         transform: scale(0.95);
+    }
+}
+
+/* 작은 모바일 화면 (480px 이하) 추가 최적화 */
+@media (max-width: 480px) {
+    body {
+        padding: 2px;
+    }
+    
+    .container {
+        border-radius: 5px;
+        min-height: calc(100vh - 4px);
+    }
+    
+    header {
+        padding: 10px;
+    }
+    
+    h1 {
+        font-size: 1.1rem;
+    }
+    
+    .main-content {
+        padding: 10px;
+        gap: 15px;
+    }
+    
+    /* 달력 더 작게 */
+    .calendar-day {
+        min-height: 45px;
+        padding: 1px;
+        font-size: 10px;
+    }
+    
+    .day-number {
+        font-size: 12px;
+        margin-bottom: 2px;
+    }
+    
+    .leave-indicator {
+        font-size: 8px;
+        padding: 1px 2px;
+    }
+    
+    /* 직원 카드 더 작게 */
+    .employee-card {
+        padding: 8px;
+    }
+    
+    .employee-name {
+        font-size: 13px;
+    }
+    
+    .employee-info {
+        font-size: 10px;
+    }
+    
+    /* 모달 더 최적화 */
+    .modal-content {
+        margin: 2% auto;
+        padding: 15px;
+        width: 98%;
+    }
+    
+    .modal h3 {
+        font-size: 1.1rem;
     }
 }
