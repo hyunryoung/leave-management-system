@@ -166,7 +166,7 @@ function showNoPermissionAlert(action) {
 }
 
 // 직원 추가
-function addEmployee() {
+async function addEmployee() {
     // 권한 체크: 매니저 이상만 가능
     if (!checkPermission('manager')) {
         showNoPermissionAlert('직원 추가');
@@ -196,6 +196,9 @@ function addEmployee() {
     calculateEmployeeLeaves(employee);
     
     employees.push(employee);
+    
+    // 개별 저장으로 충돌 방지
+    await saveEmployee(employee);
     saveData();
     
     // UI 업데이트
@@ -770,20 +773,64 @@ function updateStats() {
     `;
 }
 
-// 데이터 저장
+// 개별 직원 저장
+async function saveEmployee(employee) {
+    if (isFirebaseEnabled) {
+        try {
+            await database.ref(`employees/${employee.id}`).set(employee);
+            console.log('Firebase에 직원 저장 완료:', employee.name);
+        } catch (error) {
+            console.log('Firebase 직원 저장 실패:', error);
+        }
+    }
+}
+
+// 개별 휴가 기록 저장
+async function saveLeaveRecord(leaveRecord) {
+    if (isFirebaseEnabled) {
+        try {
+            await database.ref(`leaveRecords/${leaveRecord.id}`).set(leaveRecord);
+            console.log('Firebase에 휴가 기록 저장 완료');
+        } catch (error) {
+            console.log('Firebase 휴가 저장 실패:', error);
+        }
+    }
+}
+
+// 개별 휴가 기록 삭제
+async function deleteLeaveRecord(leaveId) {
+    if (isFirebaseEnabled) {
+        try {
+            await database.ref(`leaveRecords/${leaveId}`).remove();
+            console.log('Firebase에서 휴가 기록 삭제 완료');
+        } catch (error) {
+            console.log('Firebase 휴가 삭제 실패:', error);
+        }
+    }
+}
+
+// 데이터 저장 (기존 + 개별 저장)
 async function saveData() {
     // 로컬 백업
     localStorage.setItem('employees', JSON.stringify(employees));
     localStorage.setItem('leaveRecords', JSON.stringify(leaveRecords));
     localStorage.setItem('lastUpdate', Date.now().toString());
     
-    // Firebase에 메인 데이터 저장 (실시간 동기화)
+    // Firebase에 개별 저장 (충돌 방지)
     if (isFirebaseEnabled) {
         try {
-            await database.ref('employees').set(employees);
-            await database.ref('leaveRecords').set(leaveRecords);
+            // 직원들 개별 저장
+            for (const employee of employees) {
+                await saveEmployee(employee);
+            }
+            
+            // 휴가 기록들 개별 저장
+            for (const record of leaveRecords) {
+                await saveLeaveRecord(record);
+            }
+            
             await database.ref('lastUpdate').set(Date.now());
-            console.log('Firebase에 데이터 저장 완료');
+            console.log('Firebase에 모든 데이터 개별 저장 완료');
         } catch (error) {
             console.log('Firebase 저장 실패:', error);
         }
@@ -792,7 +839,7 @@ async function saveData() {
 
 // 데이터 불러오기
 async function loadData() {
-    // Firebase에서 우선 로드 시도
+    // Firebase에서 개별 로드 시도 (충돌 방지)
     if (isFirebaseEnabled) {
         try {
             const [employeesSnapshot, recordsSnapshot] = await Promise.all([
@@ -804,13 +851,15 @@ async function loadData() {
             const firebaseRecords = recordsSnapshot.val();
             
             if (firebaseEmployees) {
-                employees = firebaseEmployees;
+                // 객체를 배열로 변환 (개별 저장된 데이터)
+                employees = Object.values(firebaseEmployees);
                 employees.forEach(emp => calculateEmployeeLeaves(emp));
                 console.log('Firebase에서 직원 데이터 로드 완료');
             }
             
             if (firebaseRecords) {
-                leaveRecords = firebaseRecords;
+                // 객체를 배열로 변환 (개별 저장된 데이터)
+                leaveRecords = Object.values(firebaseRecords);
                 console.log('Firebase에서 휴가 데이터 로드 완료');
             }
             
@@ -1282,31 +1331,55 @@ function setupUIPermissions() {
     }
 }
 
-// 휴가/직원 데이터 실시간 구독
+// 휴가/직원 데이터 실시간 구독 (충돌 방지)
 function subscribeRealtimeData() {
     if (!isFirebaseEnabled) return;
 
-    // 직원 리스트 실시간 반영
+    // 직원 리스트 실시간 반영 (개별 방식)
     database.ref('employees').on('value', (snap) => {
         const firebaseEmployees = snap.val();
         if (firebaseEmployees) {
-            employees = firebaseEmployees;
+            // 객체를 배열로 변환 (개별 저장된 데이터)
+            const newEmployees = Object.values(firebaseEmployees);
+            
+            // 기존 데이터와 병합 (덮어쓰기 방지)
+            newEmployees.forEach(newEmp => {
+                const existingIndex = employees.findIndex(emp => emp.id === newEmp.id);
+                if (existingIndex >= 0) {
+                    employees[existingIndex] = newEmp;
+                } else {
+                    employees.push(newEmp);
+                }
+            });
+            
             employees.forEach(emp => calculateEmployeeLeaves(emp));
             renderEmployeeSummary();
             updateModalEmployeeDropdown();
             renderCalendar();
-            console.log('🔥 직원 데이터 실시간 업데이트');
+            console.log('🔥 직원 데이터 실시간 업데이트 (충돌 방지)');
         }
     });
 
-    // 휴가 레코드 실시간 반영
+    // 휴가 레코드 실시간 반영 (개별 방식)
     database.ref('leaveRecords').on('value', (snap) => {
         const firebaseRecords = snap.val();
         if (firebaseRecords) {
-            leaveRecords = firebaseRecords;
+            // 객체를 배열로 변환 (개별 저장된 데이터)
+            const newRecords = Object.values(firebaseRecords);
+            
+            // 기존 데이터와 병합 (덮어쓰기 방지)
+            newRecords.forEach(newRecord => {
+                const existingIndex = leaveRecords.findIndex(record => record.id === newRecord.id);
+                if (existingIndex >= 0) {
+                    leaveRecords[existingIndex] = newRecord;
+                } else {
+                    leaveRecords.push(newRecord);
+                }
+            });
+            
             renderEmployeeSummary();
             renderCalendar();
-            console.log('🔥 휴가 데이터 실시간 업데이트');
+            console.log('🔥 휴가 데이터 실시간 업데이트 (충돌 방지)');
         }
     });
 }
