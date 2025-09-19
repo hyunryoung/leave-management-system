@@ -71,6 +71,7 @@ function loadActiveTokens() {
 // 실시간 동기화를 위한 변수
 let syncInterval = null;
 let userToken = null;
+let isRealtimeSubscribed = false; // 중복 구독 방지
 
 // 2025년 대한민국 공휴일 데이터
 const koreanHolidays2025 = {
@@ -1393,7 +1394,10 @@ function setupUIPermissions() {
 
 // 휴가/직원 데이터 실시간 구독 (충돌 방지)
 function subscribeRealtimeData() {
-    if (!isFirebaseEnabled) return;
+    if (!isFirebaseEnabled || isRealtimeSubscribed) return;
+    
+    isRealtimeSubscribed = true; // 중복 구독 방지
+    console.log('🔥 실시간 구독 시작');
 
     // 직원 리스트 실시간 반영 (개별 방식)
     database.ref('employees').on('value', (snap) => {
@@ -1651,9 +1655,26 @@ async function deleteFromIndexedDB(key) {
     }
 }
 
+// 실시간 구독 해제
+function unsubscribeRealtimeData() {
+    if (isFirebaseEnabled && isRealtimeSubscribed) {
+        try {
+            database.ref('employees').off();
+            database.ref('leaveRecords').off();
+            isRealtimeSubscribed = false;
+            console.log('실시간 구독 해제 완료');
+        } catch (error) {
+            console.log('구독 해제 실패:', error);
+        }
+    }
+}
+
 // 로그아웃 함수
 async function logout() {
     if (confirm('로그아웃 하시겠습니까?')) {
+        // 실시간 구독 해제
+        unsubscribeRealtimeData();
+        
         // 모든 저장소에서 제거
         sessionStorage.removeItem('accessToken');
         sessionStorage.removeItem('userRole');
