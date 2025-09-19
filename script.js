@@ -434,23 +434,15 @@ function renderCalendar() {
         day.innerHTML = leaveHTML;
         day.dataset.date = currentDateStr;
         
-        // 달력 이벤트 추가 (휴가 표시가 없는 경우만)
-        day.addEventListener('mousedown', handleDateMouseDown);
-        day.addEventListener('mouseover', handleDateMouseOver);
-        day.addEventListener('mouseup', handleDateMouseUp);
-        
-        // 전체 날짜 칸 클릭 이벤트 (휴가 등록용)
-        day.addEventListener('click', (e) => {
-            // 휴가 표시를 클릭한 경우가 아니면 휴가 등록 모달 열기
-            if (!e.target.classList.contains('leave-indicator')) {
-                if (selectedDates.length === 0) {
-                    selectedDates = [currentDateStr];
-                    updateSelectedDatesDisplay();
-                    updateCalendarSelection();
-                    openLeaveModal();
-                }
-            }
-        });
+        // 휴가가 없는 날짜만 드래그/클릭 이벤트 추가
+        if (dayLeaves.length === 0) {
+            day.addEventListener('mousedown', handleDateMouseDown);
+            day.addEventListener('mouseover', handleDateMouseOver);
+            day.addEventListener('mouseup', handleDateMouseUp);
+        } else {
+            // 휴가가 있는 날짜는 드래그 비활성화
+            day.style.cursor = 'default';
+        }
         
         calendar.appendChild(day);
     }
@@ -1058,9 +1050,20 @@ function closeEmployeeDetailModal() {
 
 // 휴가 표시 클릭 핸들러
 function handleLeaveClick(event, leaveId) {
-    event.stopPropagation(); // 이벤트 전파 완전 차단
+    // 모든 이벤트 차단
+    event.stopPropagation();
+    event.stopImmediatePropagation();
     event.preventDefault();
-    showLeaveCancelModal(leaveId);
+    
+    // 다른 모달들 먼저 닫기
+    closeLeaveModal();
+    
+    // 약간의 지연 후 취소 모달 열기
+    setTimeout(() => {
+        showLeaveCancelModal(leaveId);
+    }, 100);
+    
+    return false;
 }
 
 // 휴가 취소 모달 표시
