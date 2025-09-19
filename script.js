@@ -73,8 +73,11 @@ let syncInterval = null;
 let userToken = null;
 let isRealtimeSubscribed = false; // 중복 구독 방지
 
-// 2025년 대한민국 공휴일 데이터
-const koreanHolidays2025 = {
+// 공휴일 데이터 (자동 로드)
+let koreanHolidays = {};
+
+// 기본 공휴일 (API 실패 시 사용)
+const defaultHolidays2025 = {
     '2025-01-01': '신정',
     '2025-01-28': '설날연휴',
     '2025-01-29': '설날',
@@ -93,6 +96,59 @@ const koreanHolidays2025 = {
     '2025-10-09': '한글날',
     '2025-12-25': '크리스마스'
 };
+
+// 공휴일 자동 로드
+async function loadHolidays(year) {
+    try {
+        console.log(`${year}년 공휴일 로딩 중...`);
+        
+        // 캐시된 공휴일 확인
+        const cachedKey = `holidays_${year}`;
+        const cached = localStorage.getItem(cachedKey);
+        if (cached) {
+            const cachedData = JSON.parse(cached);
+            // 1일 이내 캐시면 사용
+            if (Date.now() - cachedData.timestamp < 24 * 60 * 60 * 1000) {
+                koreanHolidays = { ...koreanHolidays, ...cachedData.holidays };
+                console.log(`${year}년 공휴일 캐시 사용`);
+                return;
+            }
+        }
+        
+        // API에서 공휴일 가져오기
+        const response = await fetch(`https://date.nager.at/api/v3/publicholidays/${year}/KR`);
+        if (response.ok) {
+            const holidays = await response.json();
+            
+            // 한국어 이름으로 변환
+            const holidayMap = {};
+            holidays.forEach(holiday => {
+                holidayMap[holiday.date] = holiday.localName || holiday.name;
+            });
+            
+            // 전역 객체에 병합
+            koreanHolidays = { ...koreanHolidays, ...holidayMap };
+            
+            // 캐시에 저장
+            localStorage.setItem(cachedKey, JSON.stringify({
+                holidays: holidayMap,
+                timestamp: Date.now()
+            }));
+            
+            console.log(`${year}년 공휴일 API 로드 완료:`, Object.keys(holidayMap).length + '개');
+        } else {
+            throw new Error('API 응답 실패');
+        }
+        
+    } catch (error) {
+        console.log(`${year}년 공휴일 API 실패, 기본 데이터 사용:`, error);
+        
+        // API 실패 시 기본 데이터 사용
+        if (year === 2025) {
+            koreanHolidays = { ...koreanHolidays, ...defaultHolidays2025 };
+        }
+    }
+}
 
 // 페이지 로드 시 초기화
 document.addEventListener('DOMContentLoaded', async function() {
@@ -115,7 +171,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     await loadData(); // Firebase에서 데이터 우선 로드
     updateCurrentTime();
     setInterval(updateCurrentTime, 1000); // 매초 시간 업데이트
-    renderCalendar();
+    await renderCalendar(); // 공휴일 로드 포함
     renderEmployeeSummary();
     updateModalEmployeeDropdown();
     
@@ -376,13 +432,17 @@ function renderEmployeeSummary() {
 }
 
 // 달력 렌더링
-function renderCalendar() {
+async function renderCalendar() {
     const calendar = document.getElementById('calendar');
     const monthYearStr = displayMonth.toLocaleDateString('ko-KR', {
         year: 'numeric',
         month: 'long'
     });
     document.getElementById('currentMonth').textContent = monthYearStr;
+    
+    // 해당 연도의 공휴일 자동 로드
+    const currentYear = displayMonth.getFullYear();
+    await loadHolidays(currentYear);
     
     calendar.innerHTML = '';
     
@@ -427,7 +487,7 @@ function renderCalendar() {
         }
         
         // 공휴일 체크
-        const isHoliday = koreanHolidays2025[currentDateStr];
+        const isHoliday = koreanHolidays[currentDateStr];
         if (isHoliday) {
             day.classList.add('holiday');
         }
@@ -499,15 +559,15 @@ function getLeavesByDate(dateStr) {
 }
 
 // 이전 달로 이동
-function previousMonth() {
+async function previousMonth() {
     displayMonth.setMonth(displayMonth.getMonth() - 1);
-    renderCalendar();
+    await renderCalendar();
 }
 
 // 다음 달로 이동
-function nextMonth() {
+async function nextMonth() {
     displayMonth.setMonth(displayMonth.getMonth() + 1);
-    renderCalendar();
+    await renderCalendar();
 }
 
 // 모달 직원 드롭다운 업데이트
