@@ -25,8 +25,8 @@ let firebase_app = null;
 let database = null;
 let isFirebaseEnabled = false;
 
-// 고유값 기반 인증 시스템 - 관리자 생성 토큰만 사용
-let ACCESS_TOKENS = {};
+// 고유값 기반 인증 시스템 - 전역 토큰 사용
+let ACCESS_TOKENS = window.ACTIVE_TOKENS || {};
 
 // 관리자가 생성한 토큰들 로드
 function loadActiveTokens() {

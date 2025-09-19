@@ -155,6 +155,14 @@ function updateMainSystemTokens() {
     // 메인 시스템에 토큰 업데이트 신호 보내기
     localStorage.setItem('tokenUpdateSignal', Date.now().toString());
     
+    // 전역 변수도 즉시 업데이트
+    if (window.ACTIVE_TOKENS) {
+        window.ACTIVE_TOKENS = { ...window.ACTIVE_TOKENS, ...activeTokens };
+    }
+    
+    // tokens.js 파일 내용을 생성하여 다운로드 링크 제공
+    generateTokensFile(activeTokens);
+    
     console.log('토큰 동기화 완료:', Object.keys(activeTokens));
 }
 
@@ -268,6 +276,51 @@ function copyToken() {
         document.body.removeChild(textArea);
         alert('자동 로그인 URL이 클립보드에 복사되었습니다!');
     });
+}
+
+// tokens.js 파일 생성 및 다운로드 제공
+function generateTokensFile(activeTokens) {
+    const tokensContent = `// 활성 토큰 목록 - 관리자가 업데이트하는 파일
+window.ACTIVE_TOKENS = ${JSON.stringify(activeTokens, null, 4)};
+
+// 마스터 관리자 토큰 (최초 설정용)
+window.MASTER_TOKEN = 'MASTER-ADMIN-2025-INIT';
+if (!window.ACTIVE_TOKENS[window.MASTER_TOKEN]) {
+    window.ACTIVE_TOKENS[window.MASTER_TOKEN] = {
+        name: '마스터 관리자',
+        role: 'admin', 
+        expires: '2026-12-31'
+    };
+}`;
+
+    // 기존 다운로드 링크 제거
+    const existingLink = document.getElementById('downloadTokensLink');
+    if (existingLink) {
+        existingLink.remove();
+    }
+    
+    // 새 다운로드 링크 생성
+    const blob = new Blob([tokensContent], { type: 'text/javascript' });
+    const url = URL.createObjectURL(blob);
+    
+    const downloadLink = document.createElement('a');
+    downloadLink.id = 'downloadTokensLink';
+    downloadLink.href = url;
+    downloadLink.download = 'tokens.js';
+    downloadLink.style.display = 'inline-block';
+    downloadLink.style.margin = '10px 0';
+    downloadLink.style.padding = '8px 15px';
+    downloadLink.style.background = '#007bff';
+    downloadLink.style.color = 'white';
+    downloadLink.style.textDecoration = 'none';
+    downloadLink.style.borderRadius = '5px';
+    downloadLink.textContent = '📁 tokens.js 다운로드 (GitHub 업데이트용)';
+    
+    // 토큰 생성 섹션에 추가
+    const tokenSection = document.querySelector('.token-section');
+    if (tokenSection) {
+        tokenSection.appendChild(downloadLink);
+    }
 }
 
 // 통계 업데이트
