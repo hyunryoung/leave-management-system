@@ -68,15 +68,15 @@ const koreanHolidays2025 = {
 };
 
 // 페이지 로드 시 초기화
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     // Firebase 초기화 시도
     initializeFirebase();
     
     // 관리자가 생성한 토큰들 로드
     loadActiveTokens();
     
-    // 토큰 기반 인증 체크
-    if (!checkTokenAuthentication()) {
+    // 토큰 기반 인증 체크 (비동기)
+    if (!(await checkTokenAuthentication())) {
         return;
     }
     
@@ -882,11 +882,12 @@ function initializeFirebase() {
 }
 
 // 토큰 기반 인증 체크
-function checkTokenAuthentication() {
+async function checkTokenAuthentication() {
     // 여러 방법으로 저장된 토큰 확인
     let savedToken = sessionStorage.getItem('accessToken') || 
                      localStorage.getItem('accessToken') ||
-                     getCookie('accessToken');
+                     getCookie('accessToken') ||
+                     await getFromIndexedDB('accessToken');
     
     if (savedToken && isValidToken(savedToken)) {
         userToken = savedToken;
@@ -894,6 +895,7 @@ function checkTokenAuthentication() {
         sessionStorage.setItem('accessToken', savedToken);
         localStorage.setItem('accessToken', savedToken);
         setCookie('accessToken', savedToken, 365); // 1년간 유지
+        await saveToIndexedDB('accessToken', savedToken); // IndexedDB에도 저장
         
         // 사용자 정보도 복구
         const tokenInfo = ACCESS_TOKENS[savedToken];
@@ -972,7 +974,7 @@ function showTokenAuthenticationModal() {
 }
 
 // 토큰 인증 시도
-function attemptTokenAuthentication() {
+async function attemptTokenAuthentication() {
     const token = document.getElementById('accessTokenInput').value.trim();
     const errorDiv = document.getElementById('tokenError');
     
@@ -987,6 +989,7 @@ function attemptTokenAuthentication() {
         localStorage.setItem('userRole', tokenInfo.role);
         localStorage.setItem('userName', tokenInfo.name);
         setCookie('accessToken', token, 365); // 1년간 유지
+        await saveToIndexedDB('accessToken', token); // IndexedDB에도 저장
         
         userToken = token;
         
@@ -1104,8 +1107,105 @@ function deleteCookie(name) {
     }
 }
 
+// IndexedDB에 데이터 저장
+async function saveToIndexedDB(key, value) {
+    try {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open('LeaveManagementDB', 1);
+            
+            request.onerror = () => reject(request.error);
+            
+            request.onsuccess = () => {
+                const db = request.result;
+                const transaction = db.transaction(['tokens'], 'readwrite');
+                const store = transaction.objectStore('tokens');
+                store.put({ key: key, value: value });
+                
+                transaction.oncomplete = () => resolve();
+                transaction.onerror = () => reject(transaction.error);
+            };
+            
+            request.onupgradeneeded = () => {
+                const db = request.result;
+                if (!db.objectStoreNames.contains('tokens')) {
+                    db.createObjectStore('tokens', { keyPath: 'key' });
+                }
+            };
+        });
+    } catch (error) {
+        console.log('IndexedDB 저장 실패:', error);
+    }
+}
+
+// IndexedDB에서 데이터 가져오기
+async function getFromIndexedDB(key) {
+    try {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open('LeaveManagementDB', 1);
+            
+            request.onerror = () => resolve(null);
+            
+            request.onsuccess = () => {
+                const db = request.result;
+                if (!db.objectStoreNames.contains('tokens')) {
+                    resolve(null);
+                    return;
+                }
+                
+                const transaction = db.transaction(['tokens'], 'readonly');
+                const store = transaction.objectStore('tokens');
+                const getRequest = store.get(key);
+                
+                getRequest.onsuccess = () => {
+                    resolve(getRequest.result ? getRequest.result.value : null);
+                };
+                getRequest.onerror = () => resolve(null);
+            };
+            
+            request.onupgradeneeded = () => {
+                const db = request.result;
+                if (!db.objectStoreNames.contains('tokens')) {
+                    db.createObjectStore('tokens', { keyPath: 'key' });
+                }
+                resolve(null);
+            };
+        });
+    } catch (error) {
+        console.log('IndexedDB 읽기 실패:', error);
+        return null;
+    }
+}
+
+// IndexedDB에서 데이터 삭제
+async function deleteFromIndexedDB(key) {
+    try {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open('LeaveManagementDB', 1);
+            
+            request.onerror = () => resolve();
+            
+            request.onsuccess = () => {
+                const db = request.result;
+                if (!db.objectStoreNames.contains('tokens')) {
+                    resolve();
+                    return;
+                }
+                
+                const transaction = db.transaction(['tokens'], 'readwrite');
+                const store = transaction.objectStore('tokens');
+                store.delete(key);
+                
+                transaction.oncomplete = () => resolve();
+                transaction.onerror = () => resolve();
+            };
+        });
+    } catch (error) {
+        console.log('IndexedDB 삭제 실패:', error);
+    }
+}
+
 // 로그아웃 함수
-function logout() {
+async function logout() {
     if (confirm('로그아웃 하시겠습니까?')) {
         // 모든 저장소에서 제거
         sessionStorage.removeItem('accessToken');
@@ -1115,6 +1215,7 @@ function logout() {
         localStorage.removeItem('userRole');
         localStorage.removeItem('userName');
         deleteCookie('accessToken');
+        await deleteFromIndexedDB('accessToken'); // IndexedDB에서도 삭제
         
         if (syncInterval) {
             clearInterval(syncInterval);
