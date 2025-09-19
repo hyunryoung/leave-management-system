@@ -427,7 +427,7 @@ function renderCalendar() {
                 let duration = '';
                 if (leave.duration === 'morning') duration = '오전';
                 else if (leave.duration === 'afternoon') duration = '오후';
-                leaveHTML += `<div class="leave-indicator ${leave.type}" onclick="showLeaveCancelModal(${leave.id})" data-leave-id="${leave.id}">${employee.name.substring(0, 3)}${duration}</div>`;
+                leaveHTML += `<div class="leave-indicator ${leave.type}" onclick="showLeaveCancelModal('${leave.id}'); event.stopPropagation();" data-leave-id="${leave.id}">${employee.name.substring(0, 3)}${duration}</div>`;
             }
         });
         
@@ -1045,7 +1045,7 @@ function closeEmployeeDetailModal() {
 
 // 휴가 취소 모달 표시
 function showLeaveCancelModal(leaveId) {
-    event.stopPropagation(); // 달력 날짜 선택 방지
+    // 이벤트 전파 방지는 onclick에서 처리됨
     
     const leave = leaveRecords.find(record => record.id.toString() === leaveId.toString());
     if (!leave) return;
