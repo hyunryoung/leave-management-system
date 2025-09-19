@@ -820,36 +820,29 @@ async function deleteLeaveRecord(leaveId) {
     }
 }
 
-// 기존 잘못된 휴가 기록 정리
+// 기존 잘못된 휴가 기록 완전 정리
 async function cleanupInvalidLeaveRecords() {
     if (!isFirebaseEnabled) return;
     
     try {
-        // 소수점이 포함된 ID를 가진 기록들 찾기
-        const invalidRecords = leaveRecords.filter(record => 
-            record.id.toString().includes('.')
+        // 소수점이 포함된 ID를 가진 기록들 완전 제거
+        leaveRecords = leaveRecords.filter(record => 
+            !record.id.toString().includes('.')
         );
         
-        if (invalidRecords.length > 0) {
-            console.log('잘못된 휴가 기록 정리 중:', invalidRecords.length + '개');
-            
-            // 잘못된 기록들을 올바른 ID로 다시 저장
-            for (let i = 0; i < invalidRecords.length; i++) {
-                const record = invalidRecords[i];
-                const newId = `${Date.now()}_cleanup_${i}`;
-                
-                // 새 ID로 업데이트
-                record.id = newId;
-                
-                // 배열에서도 업데이트
-                const index = leaveRecords.findIndex(r => r.id.toString().includes('.'));
-                if (index >= 0) {
-                    leaveRecords[index] = record;
-                }
+        console.log('잘못된 휴가 기록 완전 제거 완료, 남은 기록:', leaveRecords.length + '개');
+        
+        // Firebase에서도 잘못된 기록들 삭제
+        const firebaseRecordsSnapshot = await database.ref('leaveRecords').once('value');
+        const firebaseRecords = firebaseRecordsSnapshot.val() || {};
+        
+        for (const recordId of Object.keys(firebaseRecords)) {
+            if (recordId.includes('.')) {
+                await database.ref(`leaveRecords/${recordId}`).remove();
+                console.log('Firebase에서 잘못된 기록 삭제:', recordId);
             }
-            
-            console.log('휴가 기록 정리 완료');
         }
+        
     } catch (error) {
         console.log('휴가 기록 정리 실패:', error);
     }
@@ -900,16 +893,34 @@ async function loadData() {
             const firebaseRecords = recordsSnapshot.val();
             
             if (firebaseEmployees) {
-                // 객체를 배열로 변환 (개별 저장된 데이터)
-                employees = Object.values(firebaseEmployees);
-                employees.forEach(emp => calculateEmployeeLeaves(emp));
-                console.log('Firebase에서 직원 데이터 로드 완료');
+                // 안전한 배열 변환
+                if (Array.isArray(firebaseEmployees)) {
+                    employees = firebaseEmployees;
+                } else {
+                    employees = Object.values(firebaseEmployees);
+                }
+                
+                // 배열인지 확인 후 처리
+                if (Array.isArray(employees)) {
+                    employees.forEach(emp => calculateEmployeeLeaves(emp));
+                    console.log('Firebase에서 직원 데이터 로드 완료');
+                } else {
+                    console.log('직원 데이터 형식 오류, 빈 배열로 초기화');
+                    employees = [];
+                }
             }
             
             if (firebaseRecords) {
-                // 객체를 배열로 변환 (개별 저장된 데이터)
-                leaveRecords = Object.values(firebaseRecords);
-                console.log('Firebase에서 휴가 데이터 로드 완료');
+                // 안전한 배열 변환
+                if (Array.isArray(firebaseRecords)) {
+                    leaveRecords = firebaseRecords;
+                } else {
+                    // 객체에서 유효한 휴가 기록만 추출
+                    leaveRecords = Object.values(firebaseRecords).filter(record => 
+                        record && record.id && !record.id.toString().includes('.')
+                    );
+                }
+                console.log('Firebase에서 휴가 데이터 로드 완료:', leaveRecords.length + '개');
             }
             
             // Firebase 데이터를 로컬에도 백업
@@ -1388,17 +1399,29 @@ function subscribeRealtimeData() {
     database.ref('employees').on('value', (snap) => {
         const firebaseEmployees = snap.val();
         if (firebaseEmployees) {
-            // 객체를 배열로 변환 (개별 저장된 데이터)
-            const newEmployees = Object.values(firebaseEmployees);
-            
-            // 완전히 교체 (중복 방지)
-            employees = [...newEmployees];
-            
-            employees.forEach(emp => calculateEmployeeLeaves(emp));
-            renderEmployeeSummary();
-            updateModalEmployeeDropdown();
-            renderCalendar();
-            console.log('🔥 직원 데이터 실시간 업데이트 (중복 방지)');
+            try {
+                // 안전한 배열 변환
+                let newEmployees;
+                if (Array.isArray(firebaseEmployees)) {
+                    newEmployees = firebaseEmployees;
+                } else {
+                    newEmployees = Object.values(firebaseEmployees);
+                }
+                
+                // 완전히 교체 (중복 방지)
+                employees = [...newEmployees];
+                
+                // 배열인지 확인 후 처리
+                if (Array.isArray(employees) && employees.length > 0) {
+                    employees.forEach(emp => calculateEmployeeLeaves(emp));
+                    renderEmployeeSummary();
+                    updateModalEmployeeDropdown();
+                    renderCalendar();
+                    console.log('🔥 직원 데이터 실시간 업데이트 (중복 방지)');
+                }
+            } catch (error) {
+                console.log('직원 데이터 실시간 업데이트 실패:', error);
+            }
         }
     });
 
@@ -1406,15 +1429,26 @@ function subscribeRealtimeData() {
     database.ref('leaveRecords').on('value', (snap) => {
         const firebaseRecords = snap.val();
         if (firebaseRecords) {
-            // 객체를 배열로 변환 (개별 저장된 데이터)
-            const newRecords = Object.values(firebaseRecords);
-            
-            // 완전히 교체 (중복 방지)
-            leaveRecords = [...newRecords];
-            
-            renderEmployeeSummary();
-            renderCalendar();
-            console.log('🔥 휴가 데이터 실시간 업데이트 (중복 방지)');
+            try {
+                // 안전한 배열 변환 및 유효한 기록만 필터링
+                let newRecords;
+                if (Array.isArray(firebaseRecords)) {
+                    newRecords = firebaseRecords;
+                } else {
+                    newRecords = Object.values(firebaseRecords).filter(record => 
+                        record && record.id && !record.id.toString().includes('.')
+                    );
+                }
+                
+                // 완전히 교체 (중복 방지)
+                leaveRecords = [...newRecords];
+                
+                renderEmployeeSummary();
+                renderCalendar();
+                console.log('🔥 휴가 데이터 실시간 업데이트 (중복 방지):', leaveRecords.length + '개');
+            } catch (error) {
+                console.log('휴가 데이터 실시간 업데이트 실패:', error);
+            }
         }
     });
 }
