@@ -835,8 +835,9 @@ async function saveLeaveRecord(leaveRecord) {
 async function deleteLeaveRecord(leaveId) {
     if (isFirebaseEnabled) {
         try {
-            await database.ref(`leaveRecords/${leaveId}`).remove();
-            console.log('Firebase에서 휴가 기록 삭제 완료');
+            const safeId = leaveId.toString().replace(/\./g, '_');
+            await database.ref(`leaveRecords/${safeId}`).remove();
+            console.log('Firebase에서 휴가 기록 삭제 완료:', safeId);
         } catch (error) {
             console.log('Firebase 휴가 삭제 실패:', error);
         }
@@ -1123,7 +1124,7 @@ function closeLeaveCancelModal() {
 }
 
 // 휴가 취소 확인
-function confirmCancelLeave() {
+async function confirmCancelLeave() {
     const modal = document.getElementById('leaveCancelModal');
     const leaveId = modal.dataset.leaveId; // 문자열 ID 사용
     
@@ -1158,6 +1159,13 @@ function confirmCancelLeave() {
     
     // 휴가 기록 삭제
     leaveRecords.splice(leaveIndex, 1);
+    
+    // Firebase에서도 즉시 삭제
+    if (isFirebaseEnabled) {
+        const safeId = leave.id.toString().replace(/\./g, '_');
+        await deleteLeaveRecord(safeId);
+    }
+    
     saveData();
     
     // UI 업데이트
