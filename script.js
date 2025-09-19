@@ -9,15 +9,15 @@ let selectedDates = [];
 let isSelecting = false;
 let startDate = null;
 
-// Firebase 설정 (실제 사용시 본인의 Firebase 프로젝트 설정으로 변경)
+// Firebase 설정
 const firebaseConfig = {
-    apiKey: "your-api-key-here",
-    authDomain: "leave-management-system.firebaseapp.com",
-    databaseURL: "https://leave-management-system-default-rtdb.firebaseio.com/",
-    projectId: "leave-management-system",
-    storageBucket: "leave-management-system.appspot.com",
-    messagingSenderId: "123456789",
-    appId: "1:123456789:web:abcdef123456789"
+    apiKey: "AIzaSyA-zccMlou2FoqmiBc3XpqQUhOMv0XoJ_M",
+    authDomain: "leave-management-system-f8a52.firebaseapp.com",
+    databaseURL: "https://leave-management-system-f8a52-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "leave-management-system-f8a52",
+    storageBucket: "leave-management-system-f8a52.firebasestorage.app",
+    messagingSenderId: "863188153143",
+    appId: "1:863188153143:web:1099e6c14d24d5afb0e0b2"
 };
 
 // Firebase 초기화
@@ -956,12 +956,46 @@ function initializeFirebase() {
             database = firebase.database();
             isFirebaseEnabled = true;
             console.log('Firebase 초기화 성공');
+            
+            // Firebase에서 토큰 실시간 로드
+            loadTokensFromFirebase();
         } else {
             console.log('Firebase를 사용할 수 없습니다. 로컬 저장소를 사용합니다.');
         }
     } catch (error) {
         console.log('Firebase 초기화 실패:', error);
         isFirebaseEnabled = false;
+    }
+}
+
+// Firebase에서 토큰 실시간 로드
+function loadTokensFromFirebase() {
+    if (!isFirebaseEnabled) return;
+    
+    try {
+        const tokensRef = database.ref('tokens');
+        
+        // 실시간 리스너 설정
+        tokensRef.on('value', (snapshot) => {
+            const firebaseTokens = snapshot.val() || {};
+            
+            // Firebase 토큰을 ACCESS_TOKENS에 병합
+            Object.keys(firebaseTokens).forEach(token => {
+                const tokenInfo = firebaseTokens[token];
+                if (tokenInfo.status === 'active' && new Date(tokenInfo.expires) > new Date()) {
+                    ACCESS_TOKENS[token] = {
+                        name: tokenInfo.name,
+                        role: tokenInfo.role,
+                        expires: tokenInfo.expires
+                    };
+                }
+            });
+            
+            console.log('Firebase에서 토큰 로드 완료:', Object.keys(ACCESS_TOKENS));
+        });
+        
+    } catch (error) {
+        console.log('Firebase 토큰 로드 실패:', error);
     }
 }
 

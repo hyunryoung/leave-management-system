@@ -1,13 +1,35 @@
 // 관리자 설정
 const ADMIN_PASSWORD = 'admin2025!@#';
 
-// 토큰 저장소 (실제로는 데이터베이스 사용)
+// Firebase 설정
+const firebaseConfig = {
+    apiKey: "AIzaSyA-zccMlou2FoqmiBc3XpqQUhOMv0XoJ_M",
+    authDomain: "leave-management-system-f8a52.firebaseapp.com",
+    databaseURL: "https://leave-management-system-f8a52-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "leave-management-system-f8a52",
+    storageBucket: "leave-management-system-f8a52.firebasestorage.app",
+    messagingSenderId: "863188153143",
+    appId: "1:863188153143:web:1099e6c14d24d5afb0e0b2"
+};
+
+// Firebase 변수
+let firebase_app = null;
+let database = null;
+let isFirebaseEnabled = false;
+
+// 토큰 저장소 (Firebase + 로컬 백업)
 let tokenDatabase = JSON.parse(localStorage.getItem('tokenDatabase') || '{}');
 
 // 페이지 로드 시 초기화
 document.addEventListener('DOMContentLoaded', function() {
+    // Firebase 초기화
+    initializeFirebase();
+    
     // GitHub의 tokens.js에서 기존 토큰들 로드
     loadTokensFromGitHub();
+    
+    // Firebase에서 토큰들 로드
+    loadTokensFromFirebase();
     
     // 최초 실행 시 마스터 관리자 토큰 생성
     initializeMasterToken();
@@ -27,6 +49,78 @@ document.addEventListener('DOMContentLoaded', function() {
     nextYear.setFullYear(nextYear.getFullYear() + 1);
     document.getElementById('expiryDate').value = nextYear.toISOString().split('T')[0];
 });
+
+// Firebase 초기화
+function initializeFirebase() {
+    try {
+        if (typeof firebase !== 'undefined') {
+            firebase_app = firebase.initializeApp(firebaseConfig);
+            database = firebase.database();
+            isFirebaseEnabled = true;
+            console.log('관리자 페이지 - Firebase 초기화 성공');
+        } else {
+            console.log('Firebase를 사용할 수 없습니다. 로컬 저장소를 사용합니다.');
+        }
+    } catch (error) {
+        console.log('Firebase 초기화 실패:', error);
+        isFirebaseEnabled = false;
+    }
+}
+
+// Firebase에서 토큰들 실시간 로드
+function loadTokensFromFirebase() {
+    if (!isFirebaseEnabled) return;
+    
+    try {
+        const tokensRef = database.ref('tokens');
+        
+        // 실시간 리스너 설정
+        tokensRef.on('value', (snapshot) => {
+            const firebaseTokens = snapshot.val() || {};
+            
+            // Firebase 토큰을 로컬 데이터베이스에 병합
+            Object.keys(firebaseTokens).forEach(token => {
+                tokenDatabase[token] = firebaseTokens[token];
+            });
+            
+            // 로컬 스토리지 업데이트
+            localStorage.setItem('tokenDatabase', JSON.stringify(tokenDatabase));
+            
+            // UI 업데이트
+            loadTokenList();
+            updateStats();
+            
+            console.log('Firebase에서 토큰 로드 완료:', Object.keys(tokenDatabase));
+        });
+        
+    } catch (error) {
+        console.log('Firebase 토큰 로드 실패:', error);
+    }
+}
+
+// Firebase에 토큰 저장
+async function saveTokenToFirebase(token, tokenInfo) {
+    if (!isFirebaseEnabled) return;
+    
+    try {
+        await database.ref(`tokens/${token}`).set(tokenInfo);
+        console.log('Firebase에 토큰 저장 완료:', token);
+    } catch (error) {
+        console.log('Firebase 토큰 저장 실패:', error);
+    }
+}
+
+// Firebase에서 토큰 삭제
+async function deleteTokenFromFirebase(token) {
+    if (!isFirebaseEnabled) return;
+    
+    try {
+        await database.ref(`tokens/${token}`).remove();
+        console.log('Firebase에서 토큰 삭제 완료:', token);
+    } catch (error) {
+        console.log('Firebase 토큰 삭제 실패:', error);
+    }
+}
 
 // GitHub의 tokens.js에서 기존 토큰들 로드
 function loadTokensFromGitHub() {
@@ -100,7 +194,7 @@ function authenticateAdmin() {
 }
 
 // 토큰 생성
-function generateToken() {
+async function generateToken() {
     const userName = document.getElementById('userName').value.trim();
     const userRole = document.getElementById('userRole').value;
     const expiryDate = document.getElementById('expiryDate').value;
@@ -117,7 +211,7 @@ function generateToken() {
     const token = `USR-2025-${rolePrefix}-${randomId}-${timestamp.toString().slice(-6)}`;
     
     // 토큰 정보 저장
-    tokenDatabase[token] = {
+    const tokenInfo = {
         name: userName,
         role: userRole,
         expires: expiryDate,
@@ -126,8 +220,13 @@ function generateToken() {
         status: 'active'
     };
     
+    tokenDatabase[token] = tokenInfo;
+    
     // 로컬 스토리지에 저장
     localStorage.setItem('tokenDatabase', JSON.stringify(tokenDatabase));
+    
+    // Firebase에 즉시 저장 (실시간 동기화)
+    await saveTokenToFirebase(token, tokenInfo);
     
     // 메인 시스템의 토큰 목록도 업데이트
     updateMainSystemTokens();
@@ -259,10 +358,14 @@ function getRoleText(role) {
 }
 
 // 토큰 해지
-function revokeToken(token) {
+async function revokeToken(token) {
     if (confirm('이 토큰을 해지하시겠습니까?')) {
         tokenDatabase[token].status = 'revoked';
         localStorage.setItem('tokenDatabase', JSON.stringify(tokenDatabase));
+        
+        // Firebase에도 반영
+        await saveTokenToFirebase(token, tokenDatabase[token]);
+        
         updateMainSystemTokens();
         loadTokenList();
         updateStats();
@@ -271,10 +374,14 @@ function revokeToken(token) {
 }
 
 // 토큰 재활성화
-function reactivateToken(token) {
+async function reactivateToken(token) {
     if (confirm('이 토큰을 재활성화하시겠습니까?')) {
         tokenDatabase[token].status = 'active';
         localStorage.setItem('tokenDatabase', JSON.stringify(tokenDatabase));
+        
+        // Firebase에도 반영
+        await saveTokenToFirebase(token, tokenDatabase[token]);
+        
         updateMainSystemTokens();
         loadTokenList();
         updateStats();
@@ -283,10 +390,14 @@ function reactivateToken(token) {
 }
 
 // 토큰 삭제
-function deleteToken(token) {
+async function deleteToken(token) {
     if (confirm('이 토큰을 완전히 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
         delete tokenDatabase[token];
         localStorage.setItem('tokenDatabase', JSON.stringify(tokenDatabase));
+        
+        // Firebase에서도 삭제
+        await deleteTokenFromFirebase(token);
+        
         updateMainSystemTokens();
         loadTokenList();
         updateStats();
