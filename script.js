@@ -250,11 +250,24 @@ function calculateEmployeeLeaves(employee) {
             currentCycleStart = prevAnnualYear;
         }
         
+        // 근속연수별 연차 계산 (근로기준법 기준)
+        const calculateAnnualDays = (years) => {
+            if (years < 1) return 0;
+            if (years < 3) return 15;
+            
+            // 3년차부터 2년마다 1일씩 가산 (최대 25일)
+            const additionalYears = Math.floor((years - 1) / 2);
+            const totalDays = 15 + additionalYears;
+            return Math.min(totalDays, 25); // 최대 25일 제한
+        };
+        
+        const currentAnnualDays = calculateAnnualDays(yearsOfService);
+        
         // 연차 리셋 체크 (새로운 연차 주기가 시작되었는지)
         if (!employee.lastAnnualReset) {
             employee.lastAnnualReset = currentCycleStart.toISOString().split('T')[0];
-            employee.annualLeave = 15;
-            // 최초 설정이므로 usedAnnual은 그대로 유지 (이미 0으로 초기화됨)
+            employee.annualLeave = currentAnnualDays;
+            console.log(`${employee.name} 최초 연차 설정: ${currentAnnualDays}일 (${yearsOfService}년차)`);
         } else {
             const lastReset = new Date(employee.lastAnnualReset);
             const lastResetStr = employee.lastAnnualReset;
@@ -262,13 +275,17 @@ function calculateEmployeeLeaves(employee) {
             
             // 정확히 1년이 지났을 때만 리셋 (날짜 비교)
             if (currentCycleStr !== lastResetStr && currentCycleStart > lastReset) {
-                console.log(`${employee.name} 연차 주기 리셋: ${lastResetStr} → ${currentCycleStr}`);
+                console.log(`${employee.name} 연차 주기 리셋: ${lastResetStr} → ${currentCycleStr}, ${currentAnnualDays}일 (${yearsOfService}년차)`);
                 employee.lastAnnualReset = currentCycleStr;
-                employee.annualLeave = 15;
+                employee.annualLeave = currentAnnualDays;
                 employee.usedAnnual = 0; // 새 연차 주기에만 리셋
             } else {
-                // 같은 연차 주기 내에서는 절대 usedAnnual 건드리지 않음
-                console.log(`${employee.name} 연차 주기 유지: ${lastResetStr}, 사용량: ${employee.usedAnnual}`);
+                // 같은 연차 주기 내에서는 근속연수 증가에 따른 연차 증가만 반영
+                if (employee.annualLeave !== currentAnnualDays) {
+                    console.log(`${employee.name} 근속연수 증가로 연차 증가: ${employee.annualLeave} → ${currentAnnualDays}일`);
+                    employee.annualLeave = currentAnnualDays;
+                }
+                console.log(`${employee.name} 연차 주기 유지: ${lastResetStr}, 사용량: ${employee.usedAnnual}, 총 연차: ${currentAnnualDays}일`);
             }
         }
     }
