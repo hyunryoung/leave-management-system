@@ -895,16 +895,31 @@ async function loadData() {
             
             if (firebaseEmployees) {
                 // 안전한 배열 변환
+                let newEmployees;
                 if (Array.isArray(firebaseEmployees)) {
-                    employees = firebaseEmployees;
+                    newEmployees = firebaseEmployees;
                 } else {
-                    employees = Object.values(firebaseEmployees);
+                    newEmployees = Object.values(firebaseEmployees);
                 }
+                
+                // 중복 직원 제거 (같은 이름의 직원 중 최신 데이터만 유지)
+                const uniqueEmployees = [];
+                const seenNames = new Set();
+                
+                // 최신 데이터부터 처리 (역순)
+                newEmployees.reverse().forEach(emp => {
+                    if (!seenNames.has(emp.name)) {
+                        seenNames.add(emp.name);
+                        uniqueEmployees.unshift(emp); // 원래 순서 유지
+                    }
+                });
+                
+                employees = uniqueEmployees;
                 
                 // 배열인지 확인 후 처리
                 if (Array.isArray(employees)) {
                     employees.forEach(emp => calculateEmployeeLeaves(emp));
-                    console.log('Firebase에서 직원 데이터 로드 완료');
+                    console.log('Firebase에서 직원 데이터 로드 완료 (중복 제거):', employees.length + '명');
                 } else {
                     console.log('직원 데이터 형식 오류, 빈 배열로 초기화');
                     employees = [];
@@ -1404,7 +1419,7 @@ function subscribeRealtimeData() {
         const firebaseEmployees = snap.val();
         if (firebaseEmployees) {
             try {
-                // 안전한 배열 변환
+                // 안전한 배열 변환 및 중복 제거
                 let newEmployees;
                 if (Array.isArray(firebaseEmployees)) {
                     newEmployees = firebaseEmployees;
@@ -1412,8 +1427,20 @@ function subscribeRealtimeData() {
                     newEmployees = Object.values(firebaseEmployees);
                 }
                 
+                // 중복 직원 제거 (같은 이름의 직원 중 최신 데이터만 유지)
+                const uniqueEmployees = [];
+                const seenNames = new Set();
+                
+                // 최신 데이터부터 처리 (역순)
+                newEmployees.reverse().forEach(emp => {
+                    if (!seenNames.has(emp.name)) {
+                        seenNames.add(emp.name);
+                        uniqueEmployees.unshift(emp); // 원래 순서 유지
+                    }
+                });
+                
                 // 완전히 교체 (중복 방지)
-                employees = [...newEmployees];
+                employees = uniqueEmployees;
                 
                 // 배열인지 확인 후 처리
                 if (Array.isArray(employees) && employees.length > 0) {
