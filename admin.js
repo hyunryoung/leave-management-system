@@ -78,19 +78,19 @@ function loadTokensFromFirebase() {
         tokensRef.on('value', (snapshot) => {
             const firebaseTokens = snapshot.val() || {};
             
-            // Firebase 토큰을 로컬 데이터베이스에 병합
-            Object.keys(firebaseTokens).forEach(token => {
-                tokenDatabase[token] = firebaseTokens[token];
-            });
+            // Firebase 토큰으로 완전히 교체 (동기화)
+            tokenDatabase = { ...firebaseTokens };
             
             // 로컬 스토리지 업데이트
             localStorage.setItem('tokenDatabase', JSON.stringify(tokenDatabase));
             
-            // UI 업데이트
-            loadTokenList();
-            updateStats();
+            // UI 업데이트 (관리자 페이지에서만)
+            if (document.getElementById('tokenList')) {
+                loadTokenList();
+                updateStats();
+            }
             
-            console.log('Firebase에서 토큰 로드 완료:', Object.keys(tokenDatabase));
+            console.log('🔥 Firebase 실시간 동기화 완료:', Object.keys(tokenDatabase));
         });
         
     } catch (error) {
@@ -153,15 +153,19 @@ function loadTokensFromGitHub() {
 }
 
 // 최초 마스터 관리자 토큰 생성
-function initializeMasterToken() {
-    // 이미 토큰이 있으면 생성하지 않음
+async function initializeMasterToken() {
+    // Firebase에서 토큰 로드 대기 (2초)
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Firebase에서 로드된 토큰이 있으면 생성하지 않음
     if (Object.keys(tokenDatabase).length > 0) {
+        console.log('기존 토큰들이 있어서 마스터 토큰 생성 생략');
         return;
     }
     
     // 마스터 관리자 토큰 생성
     const masterToken = 'MASTER-ADMIN-2025-INIT';
-    tokenDatabase[masterToken] = {
+    const tokenInfo = {
         name: '마스터 관리자',
         role: 'admin',
         expires: '2026-12-31',
@@ -170,7 +174,12 @@ function initializeMasterToken() {
         status: 'active'
     };
     
+    tokenDatabase[masterToken] = tokenInfo;
     localStorage.setItem('tokenDatabase', JSON.stringify(tokenDatabase));
+    
+    // Firebase에도 저장
+    await saveTokenToFirebase(masterToken, tokenInfo);
+    
     updateMainSystemTokens();
     
     console.log('마스터 관리자 토큰 생성됨:', masterToken);
