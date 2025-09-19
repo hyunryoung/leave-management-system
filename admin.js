@@ -69,8 +69,20 @@ function generateToken() {
     // 메인 시스템의 토큰 목록도 업데이트
     updateMainSystemTokens();
     
-    // 생성된 토큰 표시
-    document.getElementById('newTokenDisplay').textContent = token;
+    // 생성된 토큰과 URL 표시
+    const currentDomain = window.location.origin;
+    const loginUrl = `${currentDomain}${window.location.pathname.replace('admin.html', 'index.html')}?token=${token}`;
+    
+    document.getElementById('newTokenDisplay').innerHTML = `
+        <div><strong>토큰:</strong> <code>${token}</code></div>
+        <div style="margin-top: 10px;"><strong>자동 로그인 URL:</strong></div>
+        <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; word-break: break-all; font-size: 12px;">
+            <a href="${loginUrl}" target="_blank">${loginUrl}</a>
+        </div>
+        <div style="margin-top: 8px; font-size: 12px; color: #666;">
+            ↑ 이 링크를 직원에게 전달하면 토큰 입력 없이 바로 로그인됩니다
+        </div>
+    `;
     document.getElementById('generatedToken').style.display = 'block';
     
     // 폼 초기화
@@ -198,20 +210,20 @@ function deleteToken(token) {
     }
 }
 
-// 토큰 복사
+// 로그인 URL 복사
 function copyToken() {
-    const token = document.getElementById('newTokenDisplay').textContent;
-    navigator.clipboard.writeText(token).then(() => {
-        alert('토큰이 클립보드에 복사되었습니다!');
+    const loginUrl = document.querySelector('#newTokenDisplay a').href;
+    navigator.clipboard.writeText(loginUrl).then(() => {
+        alert('자동 로그인 URL이 클립보드에 복사되었습니다!\n직원들에게 이 링크를 전달하세요.');
     }).catch(() => {
         // 클립보드 API가 지원되지 않는 경우
         const textArea = document.createElement('textarea');
-        textArea.value = token;
+        textArea.value = loginUrl;
         document.body.appendChild(textArea);
         textArea.select();
         document.execCommand('copy');
         document.body.removeChild(textArea);
-        alert('토큰이 클립보드에 복사되었습니다!');
+        alert('자동 로그인 URL이 클립보드에 복사되었습니다!');
     });
 }
 

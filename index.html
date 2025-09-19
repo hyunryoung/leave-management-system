@@ -113,5 +113,30 @@
     </div>
 
     <script src="script.js"></script>
+    
+    <!-- URL 토큰 자동로그인 -->
+    <script>
+    (function autoLoginFromQuery() {
+        try {
+            const url = new URL(location.href);
+            const token = url.searchParams.get('token');
+            if (!token) return;
+
+            // 모든 저장소에 토큰 저장
+            localStorage.setItem('accessToken', token);
+            sessionStorage.setItem('accessToken', token);
+            document.cookie = `accessToken=${token};path=/;SameSite=Lax`;
+
+            // URL 정리 (토큰 파라미터 제거)
+            url.searchParams.delete('token');
+            history.replaceState(null, '', url.toString());
+            
+            // 페이지 새로고침으로 자동 로그인 실행
+            location.reload();
+        } catch (error) {
+            console.log('자동 로그인 실패:', error);
+        }
+    })();
+    </script>
 </body>
 </html>
