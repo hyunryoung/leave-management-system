@@ -1047,7 +1047,7 @@ function closeEmployeeDetailModal() {
 function showLeaveCancelModal(leaveId) {
     event.stopPropagation(); // 달력 날짜 선택 방지
     
-    const leave = leaveRecords.find(record => record.id === leaveId);
+    const leave = leaveRecords.find(record => record.id.toString() === leaveId.toString());
     if (!leave) return;
     
     const employee = employees.find(emp => emp.id === leave.employeeId);
@@ -1090,7 +1090,7 @@ function confirmCancelLeave() {
     
     if (!leaveId) return;
     
-    const leaveIndex = leaveRecords.findIndex(record => record.id === leaveId);
+    const leaveIndex = leaveRecords.findIndex(record => record.id.toString() === leaveId.toString());
     if (leaveIndex === -1) return;
     
     const leave = leaveRecords[leaveIndex];
