@@ -115,8 +115,33 @@ function updateCurrentTime() {
     document.getElementById('currentTime').textContent = timeStr;
 }
 
+// 권한 체크 함수
+function checkPermission(requiredRole) {
+    const userRole = sessionStorage.getItem('userRole') || localStorage.getItem('userRole');
+    const roleHierarchy = { 'user': 1, 'manager': 2, 'admin': 3 };
+    
+    const userLevel = roleHierarchy[userRole] || 0;
+    const requiredLevel = roleHierarchy[requiredRole] || 0;
+    
+    return userLevel >= requiredLevel;
+}
+
+// 권한 없음 알림
+function showNoPermissionAlert(action) {
+    const userRole = sessionStorage.getItem('userRole') || localStorage.getItem('userRole');
+    const roleText = userRole === 'user' ? '일반 사용자' : 
+                     userRole === 'manager' ? '매니저' : '알 수 없음';
+    alert(`권한이 부족합니다.\n현재 권한: ${roleText}\n필요 권한: 관리자 또는 매니저\n\n${action} 기능은 관리자나 매니저만 사용할 수 있습니다.`);
+}
+
 // 직원 추가
 function addEmployee() {
+    // 권한 체크: 매니저 이상만 가능
+    if (!checkPermission('manager')) {
+        showNoPermissionAlert('직원 추가');
+        return;
+    }
+    
     const name = document.getElementById('employeeName').value.trim();
     const joinDate = document.getElementById('joinDate').value;
     
@@ -214,6 +239,12 @@ function calculateLeaves() {
 
 // 직원 삭제
 function deleteEmployee(id) {
+    // 권한 체크: 관리자만 가능
+    if (!checkPermission('admin')) {
+        showNoPermissionAlert('직원 삭제');
+        return;
+    }
+    
     if (confirm('정말로 이 직원을 삭제하시겠습니까?')) {
         employees = employees.filter(emp => emp.id !== id);
         leaveRecords = leaveRecords.filter(record => record.employeeId !== id);
@@ -258,8 +289,13 @@ function renderEmployeeSummary() {
             `;
         }
         
+        // 권한에 따른 삭제 버튼 표시
+        const deleteButton = checkPermission('admin') ? 
+            `<button class="delete-employee" onclick="deleteEmployee(${employee.id}); event.stopPropagation();">×</button>` : 
+            '';
+        
         card.innerHTML = `
-            <button class="delete-employee" onclick="deleteEmployee(${employee.id}); event.stopPropagation();">×</button>
+            ${deleteButton}
             <div class="employee-name">${employee.name}</div>
             <div class="employee-info">
                 입사: ${employee.joinDate} (${years}년 ${months}개월)
@@ -520,7 +556,19 @@ function closeLeaveModal() {
 
 // 휴가 등록
 function registerLeave() {
+    // 권한 체크: 매니저 이상만 가능 (또는 본인 휴가만)
     const employeeId = parseInt(document.getElementById('modalEmployee').value);
+    const currentUserName = sessionStorage.getItem('userName') || localStorage.getItem('userName');
+    const selectedEmployee = employees.find(emp => emp.id === employeeId);
+    
+    // 본인 휴가가 아니면 매니저 이상 권한 필요
+    if (selectedEmployee && selectedEmployee.name !== currentUserName) {
+        if (!checkPermission('manager')) {
+            showNoPermissionAlert('다른 직원의 휴가 등록');
+            return;
+        }
+    }
+    
     const leaveType = document.getElementById('modalLeaveType').value;
     const leaveDuration = document.getElementById('modalDuration').value;
     const reason = document.getElementById('modalReason').value.trim();
@@ -840,6 +888,16 @@ function confirmCancelLeave() {
     
     const leave = leaveRecords[leaveIndex];
     const employee = employees.find(emp => emp.id === leave.employeeId);
+    const currentUserName = sessionStorage.getItem('userName') || localStorage.getItem('userName');
+    
+    // 본인 휴가가 아니면 매니저 이상 권한 필요
+    if (employee && employee.name !== currentUserName) {
+        if (!checkPermission('manager')) {
+            showNoPermissionAlert('다른 직원의 휴가 취소');
+            closeLeaveCancelModal();
+            return;
+        }
+    }
     
     if (employee) {
         // 휴가 복구
@@ -1018,6 +1076,28 @@ function getUserRole(password) {
     return 'user';
 }
 
+// UI 권한 설정
+function setupUIPermissions() {
+    const userRole = sessionStorage.getItem('userRole') || localStorage.getItem('userRole');
+    const userName = sessionStorage.getItem('userName') || localStorage.getItem('userName');
+    
+    // 직원 추가 폼은 매니저 이상만 표시
+    const addEmployeeDiv = document.querySelector('.add-employee');
+    if (addEmployeeDiv) {
+        if (!checkPermission('manager')) {
+            addEmployeeDiv.style.display = 'none';
+        }
+    }
+    
+    // 사용자 정보 표시
+    const header = document.querySelector('header h1');
+    if (header && userName) {
+        const roleText = userRole === 'admin' ? '관리자' : 
+                        userRole === 'manager' ? '매니저' : '사용자';
+        header.textContent = `휴가 관리 시스템 - ${userName} (${roleText})`;
+    }
+}
+
 // 메인 앱 초기화
 function initializeApp() {
     loadData();
@@ -1027,6 +1107,7 @@ function initializeApp() {
     renderEmployeeSummary();
     updateModalEmployeeDropdown();
     startRealTimeSync();
+    setupUIPermissions(); // UI 권한 설정
     
     // 매일 자정에 연차/월차 자동 계산
     setInterval(calculateLeaves, 60000);
