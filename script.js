@@ -672,9 +672,9 @@ function registerLeave() {
     }
     
     // 각 날짜에 대해 휴가 기록 추가
-    selectedDates.forEach(dateStr => {
+    selectedDates.forEach((dateStr, index) => {
         const leaveRecord = {
-            id: Date.now() + Math.random(), // 유니크 ID
+            id: `${Date.now()}_${index}`, // Firebase 호환 ID (점 제거)
             employeeId: employeeId,
             type: leaveType,
             duration: leaveDuration,
@@ -1016,7 +1016,7 @@ function closeLeaveCancelModal() {
 // 휴가 취소 확인
 function confirmCancelLeave() {
     const modal = document.getElementById('leaveCancelModal');
-    const leaveId = parseFloat(modal.dataset.leaveId);
+    const leaveId = modal.dataset.leaveId; // 문자열 ID 사용
     
     if (!leaveId) return;
     
