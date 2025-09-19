@@ -344,9 +344,12 @@ function renderEmployeeSummary() {
             `;
         } else {
             // 1년 이상 - 연차만
+            const remainingAnnual = (employee.annualLeave || 15) - (employee.usedAnnual || 0);
+            console.log(`${employee.name} 연차 계산: 총 ${employee.annualLeave}, 사용 ${employee.usedAnnual}, 잔여 ${remainingAnnual}`);
+            
             leaveDisplay = `
                 <div class="leave-summary">
-                    <div class="leave-item annual">연차: ${(employee.annualLeave - employee.usedAnnual).toFixed(1)}</div>
+                    <div class="leave-item annual">연차: ${remainingAnnual.toFixed(1)}</div>
                     <div class="leave-item" style="background:#f8f9fa; color:#666;">월차: 없음</div>
                 </div>
             `;
