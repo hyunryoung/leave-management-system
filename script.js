@@ -1484,9 +1484,52 @@ function subscribeRealtimeData() {
     });
 }
 
+// Firebase 데이터 완전 정리
+async function cleanupFirebaseData() {
+    if (!isFirebaseEnabled) return;
+    
+    try {
+        console.log('🧹 Firebase 데이터 정리 시작...');
+        
+        // 기존 employees 노드 완전 삭제
+        await database.ref('employees').remove();
+        
+        // 기존 leaveRecords 노드 완전 삭제  
+        await database.ref('leaveRecords').remove();
+        
+        console.log('🧹 Firebase 데이터 정리 완료');
+        
+        // 현재 로컬 데이터를 깨끗하게 다시 저장
+        if (employees.length > 0) {
+            for (const employee of employees) {
+                await saveEmployee(employee);
+            }
+        }
+        
+        if (leaveRecords.length > 0) {
+            for (const record of leaveRecords) {
+                await saveLeaveRecord(record);
+            }
+        }
+        
+        console.log('🧹 깨끗한 데이터로 재저장 완료');
+        
+    } catch (error) {
+        console.log('Firebase 정리 실패:', error);
+    }
+}
+
 // 메인 앱 초기화
 async function initializeApp() {
     await loadData(); // Firebase에서 데이터 로드
+    
+    // 한 번만 데이터 정리 실행 (관리자만)
+    const userRole = sessionStorage.getItem('userRole');
+    if (userRole === 'admin' && !localStorage.getItem('dataCleanupDone')) {
+        await cleanupFirebaseData();
+        localStorage.setItem('dataCleanupDone', 'true');
+    }
+    
     updateCurrentTime();
     setInterval(updateCurrentTime, 1000);
     renderCalendar();
