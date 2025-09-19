@@ -427,17 +427,30 @@ function renderCalendar() {
                 let duration = '';
                 if (leave.duration === 'morning') duration = '오전';
                 else if (leave.duration === 'afternoon') duration = '오후';
-                leaveHTML += `<div class="leave-indicator ${leave.type}" onclick="showLeaveCancelModal('${leave.id}'); event.stopPropagation();" data-leave-id="${leave.id}">${employee.name.substring(0, 3)}${duration}</div>`;
+                leaveHTML += `<div class="leave-indicator ${leave.type}" onclick="handleLeaveClick(event, '${leave.id}')" data-leave-id="${leave.id}">${employee.name.substring(0, 3)}${duration}</div>`;
             }
         });
         
         day.innerHTML = leaveHTML;
         day.dataset.date = currentDateStr;
         
-        // 달력 이벤트 추가
+        // 달력 이벤트 추가 (휴가 표시가 없는 경우만)
         day.addEventListener('mousedown', handleDateMouseDown);
         day.addEventListener('mouseover', handleDateMouseOver);
         day.addEventListener('mouseup', handleDateMouseUp);
+        
+        // 전체 날짜 칸 클릭 이벤트 (휴가 등록용)
+        day.addEventListener('click', (e) => {
+            // 휴가 표시를 클릭한 경우가 아니면 휴가 등록 모달 열기
+            if (!e.target.classList.contains('leave-indicator')) {
+                if (selectedDates.length === 0) {
+                    selectedDates = [currentDateStr];
+                    updateSelectedDatesDisplay();
+                    updateCalendarSelection();
+                    openLeaveModal();
+                }
+            }
+        });
         
         calendar.appendChild(day);
     }
@@ -1043,9 +1056,15 @@ function closeEmployeeDetailModal() {
     modal.style.display = 'none';
 }
 
+// 휴가 표시 클릭 핸들러
+function handleLeaveClick(event, leaveId) {
+    event.stopPropagation(); // 이벤트 전파 완전 차단
+    event.preventDefault();
+    showLeaveCancelModal(leaveId);
+}
+
 // 휴가 취소 모달 표시
 function showLeaveCancelModal(leaveId) {
-    // 이벤트 전파 방지는 onclick에서 처리됨
     
     const leave = leaveRecords.find(record => record.id.toString() === leaveId.toString());
     if (!leave) return;
