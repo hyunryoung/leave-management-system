@@ -101,6 +101,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     // 관리자가 생성한 토큰들 로드
     loadActiveTokens();
     
+    // Firebase 토큰 구독이 켜졌다면, 처음 동기화 끝날 때까지 대기
+    if (isFirebaseEnabled) {
+        await waitForInitialTokensLoad();
+    }
+    
     // 토큰 기반 인증 체크 (비동기)
     if (!(await checkTokenAuthentication())) {
         return;
@@ -1014,6 +1019,34 @@ function initializeFirebase() {
     }
 }
 
+// 최초 토큰 로드 완료 대기
+function waitForInitialTokensLoad(timeoutMs = 3000) {
+    return new Promise((resolve) => {
+        if (!isFirebaseEnabled) {
+            resolve();
+            return;
+        }
+        
+        let done = false;
+        const finish = () => { 
+            if (!done) { 
+                done = true; 
+                resolve(); 
+            } 
+        };
+        
+        // 첫 value 이벤트로 토큰을 메모리에 반영한 다음 resolve
+        const tokensRef = database.ref('tokens');
+        const onceHandler = tokensRef.on('value', () => {
+            tokensRef.off('value', onceHandler);
+            finish();
+        });
+        
+        // 타임아웃 보조
+        setTimeout(finish, timeoutMs);
+    });
+}
+
 // Firebase에서 토큰 실시간 로드
 function loadTokensFromFirebase() {
     if (!isFirebaseEnabled) return;
@@ -1053,7 +1086,7 @@ async function checkTokenAuthentication() {
                      getCookie('accessToken') ||
                      await getFromIndexedDB('accessToken');
     
-    if (savedToken && isValidToken(savedToken)) {
+    if (savedToken && await isValidToken(savedToken)) {
         userToken = savedToken;
         // 토큰을 모든 저장소에 저장
         sessionStorage.setItem('accessToken', savedToken);
@@ -1077,39 +1110,56 @@ async function checkTokenAuthentication() {
     return false;
 }
 
-// 토큰 유효성 검사
-function isValidToken(token) {
-    // 먼저 현재 로드된 토큰에서 확인
-    let tokenInfo = ACCESS_TOKENS[token];
+// 토큰 유효성 검사 (Firebase DB 기준)
+async function isValidToken(token) {
+    // 1) 메모리에서 빠르게 시도
+    let info = ACCESS_TOKENS[token];
     
-    // 없으면 관리자 데이터베이스에서 직접 확인
-    if (!tokenInfo) {
+    // 2) 메모리에 없으면 Firebase DB 직접 조회
+    if (!info && isFirebaseEnabled) {
+        try {
+            const dbSnap = await database.ref(`tokens/${token}`).once('value');
+            const data = dbSnap.val();
+            if (data) {
+                info = data;
+                // 메모리 캐시에도 채워줌
+                ACCESS_TOKENS[token] = { 
+                    name: data.name, 
+                    role: data.role, 
+                    expires: data.expires 
+                };
+                console.log('Firebase에서 토큰 정보 로드:', token);
+            }
+        } catch (error) {
+            console.log('Firebase 토큰 조회 실패:', error);
+        }
+    }
+    
+    // 3) 로컬 데이터베이스에서도 확인 (Firebase 실패 시)
+    if (!info) {
         try {
             const tokenDatabase = JSON.parse(localStorage.getItem('tokenDatabase') || '{}');
             if (tokenDatabase[token]) {
                 const dbTokenInfo = tokenDatabase[token];
                 if (dbTokenInfo.status === 'active' && new Date(dbTokenInfo.expires) > new Date()) {
-                    // 즉시 ACCESS_TOKENS에 추가
                     ACCESS_TOKENS[token] = {
                         name: dbTokenInfo.name,
                         role: dbTokenInfo.role,
                         expires: dbTokenInfo.expires
                     };
-                    tokenInfo = ACCESS_TOKENS[token];
+                    info = ACCESS_TOKENS[token];
                 }
             }
         } catch (error) {
-            console.log('토큰 데이터베이스 확인 실패:', error);
+            console.log('로컬 토큰 데이터베이스 확인 실패:', error);
         }
     }
     
-    if (!tokenInfo) return false;
+    if (!info) return false;
     
-    // 만료일 체크
-    const expireDate = new Date(tokenInfo.expires);
-    const today = new Date();
-    
-    return today <= expireDate;
+    // 만료일 및 상태 체크
+    return (info.status ? info.status === 'active' : true) &&
+           (new Date(info.expires) >= new Date());
 }
 
 // 토큰 인증 모달 표시
@@ -1165,7 +1215,7 @@ async function attemptTokenAuthentication() {
     const token = document.getElementById('accessTokenInput').value.trim();
     const errorDiv = document.getElementById('tokenError');
     
-    if (isValidToken(token)) {
+    if (await isValidToken(token)) {
         // 인증 성공
         const tokenInfo = ACCESS_TOKENS[token];
         // 모든 저장소에 저장 (최대한 안정적인 유지)
@@ -1227,6 +1277,35 @@ function setupUIPermissions() {
     }
 }
 
+// 휴가/직원 데이터 실시간 구독
+function subscribeRealtimeData() {
+    if (!isFirebaseEnabled) return;
+
+    // 직원 리스트 실시간 반영
+    database.ref('employees').on('value', (snap) => {
+        const firebaseEmployees = snap.val();
+        if (firebaseEmployees) {
+            employees = firebaseEmployees;
+            employees.forEach(emp => calculateEmployeeLeaves(emp));
+            renderEmployeeSummary();
+            updateModalEmployeeDropdown();
+            renderCalendar();
+            console.log('🔥 직원 데이터 실시간 업데이트');
+        }
+    });
+
+    // 휴가 레코드 실시간 반영
+    database.ref('leaveRecords').on('value', (snap) => {
+        const firebaseRecords = snap.val();
+        if (firebaseRecords) {
+            leaveRecords = firebaseRecords;
+            renderEmployeeSummary();
+            renderCalendar();
+            console.log('🔥 휴가 데이터 실시간 업데이트');
+        }
+    });
+}
+
 // 메인 앱 초기화
 async function initializeApp() {
     await loadData(); // Firebase에서 데이터 로드
@@ -1236,6 +1315,7 @@ async function initializeApp() {
     renderEmployeeSummary();
     updateModalEmployeeDropdown();
     startRealTimeSync();
+    subscribeRealtimeData(); // ★ 추가: 다른 PC 변경 즉시 반영
     setupUIPermissions(); // UI 권한 설정
     
     // 매일 자정에 연차/월차 자동 계산
