@@ -883,14 +883,25 @@ function initializeFirebase() {
 
 // 토큰 기반 인증 체크
 function checkTokenAuthentication() {
-    // 세션 스토리지와 로컬 스토리지 둘 다 확인
-    let savedToken = sessionStorage.getItem('accessToken') || localStorage.getItem('accessToken');
+    // 여러 방법으로 저장된 토큰 확인
+    let savedToken = sessionStorage.getItem('accessToken') || 
+                     localStorage.getItem('accessToken') ||
+                     getCookie('accessToken');
     
     if (savedToken && isValidToken(savedToken)) {
         userToken = savedToken;
-        // 토큰을 양쪽 스토리지에 모두 저장
+        // 토큰을 모든 저장소에 저장
         sessionStorage.setItem('accessToken', savedToken);
         localStorage.setItem('accessToken', savedToken);
+        setCookie('accessToken', savedToken, 365); // 1년간 유지
+        
+        // 사용자 정보도 복구
+        const tokenInfo = ACCESS_TOKENS[savedToken];
+        sessionStorage.setItem('userRole', tokenInfo.role);
+        sessionStorage.setItem('userName', tokenInfo.name);
+        localStorage.setItem('userRole', tokenInfo.role);
+        localStorage.setItem('userName', tokenInfo.name);
+        
         startRealTimeSync();
         return true;
     }
@@ -968,13 +979,14 @@ function attemptTokenAuthentication() {
     if (isValidToken(token)) {
         // 인증 성공
         const tokenInfo = ACCESS_TOKENS[token];
-        // 양쪽 스토리지에 모두 저장 (더 안정적인 유지)
+        // 모든 저장소에 저장 (최대한 안정적인 유지)
         sessionStorage.setItem('accessToken', token);
         sessionStorage.setItem('userRole', tokenInfo.role);
         sessionStorage.setItem('userName', tokenInfo.name);
         localStorage.setItem('accessToken', token);
         localStorage.setItem('userRole', tokenInfo.role);
         localStorage.setItem('userName', tokenInfo.name);
+        setCookie('accessToken', token, 365); // 1년간 유지
         
         userToken = token;
         
@@ -1055,16 +1067,55 @@ function logTokenUsage(token) {
     }
 }
 
+// 쿠키 설정 함수
+function setCookie(name, value, days) {
+    try {
+        const expires = new Date();
+        expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+        document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
+    } catch (error) {
+        console.log('쿠키 설정 실패:', error);
+    }
+}
+
+// 쿠키 가져오기 함수
+function getCookie(name) {
+    try {
+        const nameEQ = name + "=";
+        const ca = document.cookie.split(';');
+        for (let i = 0; i < ca.length; i++) {
+            let c = ca[i];
+            while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+            if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+        }
+        return null;
+    } catch (error) {
+        console.log('쿠키 읽기 실패:', error);
+        return null;
+    }
+}
+
+// 쿠키 삭제 함수
+function deleteCookie(name) {
+    try {
+        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
+    } catch (error) {
+        console.log('쿠키 삭제 실패:', error);
+    }
+}
+
 // 로그아웃 함수
 function logout() {
     if (confirm('로그아웃 하시겠습니까?')) {
-        // 양쪽 스토리지에서 모두 제거
+        // 모든 저장소에서 제거
         sessionStorage.removeItem('accessToken');
         sessionStorage.removeItem('userRole');
         sessionStorage.removeItem('userName');
         localStorage.removeItem('accessToken');
         localStorage.removeItem('userRole');
         localStorage.removeItem('userName');
+        deleteCookie('accessToken');
+        
         if (syncInterval) {
             clearInterval(syncInterval);
         }
