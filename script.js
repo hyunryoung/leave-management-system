@@ -35,10 +35,33 @@ let ACCESS_TOKENS = {
 
 // 관리자가 생성한 토큰들 로드
 function loadActiveTokens() {
-    const activeTokens = localStorage.getItem('activeTokens');
-    if (activeTokens) {
-        const adminTokens = JSON.parse(activeTokens);
-        ACCESS_TOKENS = { ...ACCESS_TOKENS, ...adminTokens };
+    try {
+        // 관리자 페이지에서 생성한 토큰들
+        const activeTokens = localStorage.getItem('activeTokens');
+        if (activeTokens) {
+            const adminTokens = JSON.parse(activeTokens);
+            ACCESS_TOKENS = { ...ACCESS_TOKENS, ...adminTokens };
+        }
+        
+        // 관리자 토큰 데이터베이스에서도 로드
+        const tokenDatabase = localStorage.getItem('tokenDatabase');
+        if (tokenDatabase) {
+            const allTokens = JSON.parse(tokenDatabase);
+            Object.keys(allTokens).forEach(token => {
+                const tokenInfo = allTokens[token];
+                if (tokenInfo.status === 'active' && new Date(tokenInfo.expires) > new Date()) {
+                    ACCESS_TOKENS[token] = {
+                        name: tokenInfo.name,
+                        role: tokenInfo.role,
+                        expires: tokenInfo.expires
+                    };
+                }
+            });
+        }
+        
+        console.log('로드된 토큰들:', Object.keys(ACCESS_TOKENS));
+    } catch (error) {
+        console.log('토큰 로드 실패:', error);
     }
 }
 
