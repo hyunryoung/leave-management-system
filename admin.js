@@ -6,8 +6,14 @@ let tokenDatabase = JSON.parse(localStorage.getItem('tokenDatabase') || '{}');
 
 // 페이지 로드 시 초기화
 document.addEventListener('DOMContentLoaded', function() {
+    // 최초 실행 시 마스터 관리자 토큰 생성
+    initializeMasterToken();
+    
     // Enter 키로 관리자 로그인
-    document.getElementById('adminPassword').addEventListener('keypress', function(e) {
+    const adminPwInput = document.getElementById('adminPassword');
+    if (!adminPwInput) return; // 관리자 페이지가 아니면 조용히 종료
+    
+    adminPwInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             authenticateAdmin();
         }
@@ -18,6 +24,30 @@ document.addEventListener('DOMContentLoaded', function() {
     nextYear.setFullYear(nextYear.getFullYear() + 1);
     document.getElementById('expiryDate').value = nextYear.toISOString().split('T')[0];
 });
+
+// 최초 마스터 관리자 토큰 생성
+function initializeMasterToken() {
+    // 이미 토큰이 있으면 생성하지 않음
+    if (Object.keys(tokenDatabase).length > 0) {
+        return;
+    }
+    
+    // 마스터 관리자 토큰 생성
+    const masterToken = 'MASTER-ADMIN-2025-INIT';
+    tokenDatabase[masterToken] = {
+        name: '마스터 관리자',
+        role: 'admin',
+        expires: '2026-12-31',
+        created: new Date().toISOString(),
+        lastUsed: null,
+        status: 'active'
+    };
+    
+    localStorage.setItem('tokenDatabase', JSON.stringify(tokenDatabase));
+    updateMainSystemTokens();
+    
+    console.log('마스터 관리자 토큰 생성됨:', masterToken);
+}
 
 // 관리자 인증
 function authenticateAdmin() {
@@ -112,7 +142,11 @@ function updateMainSystemTokens() {
         }
     });
     
+    // 두 곳 모두에 저장해서 확실히 동기화
     localStorage.setItem('activeTokens', JSON.stringify(activeTokens));
+    localStorage.setItem('adminGeneratedTokens', JSON.stringify(activeTokens));
+    
+    console.log('토큰 동기화 완료:', Object.keys(activeTokens));
 }
 
 // 토큰 목록 로드

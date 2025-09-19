@@ -25,13 +25,8 @@ let firebase_app = null;
 let database = null;
 let isFirebaseEnabled = false;
 
-// 고유값 기반 인증 시스템 - 동적 토큰 로드
-let ACCESS_TOKENS = {
-    // 기본 테스트 토큰들
-    'USR-2025-HR-001': { name: 'HR 관리자', role: 'admin', expires: '2025-12-31' },
-    'USR-2025-MGR-002': { name: '부서 매니저', role: 'manager', expires: '2025-12-31' },
-    'USR-2025-EMP-003': { name: '직원1', role: 'user', expires: '2025-12-31' }
-};
+// 고유값 기반 인증 시스템 - 관리자 생성 토큰만 사용
+let ACCESS_TOKENS = {};
 
 // 관리자가 생성한 토큰들 로드
 function loadActiveTokens() {
@@ -45,6 +40,8 @@ function loadActiveTokens() {
         
         // 관리자 토큰 데이터베이스에서도 로드
         const tokenDatabase = localStorage.getItem('tokenDatabase');
+        const adminGeneratedTokens = localStorage.getItem('adminGeneratedTokens');
+        
         if (tokenDatabase) {
             const allTokens = JSON.parse(tokenDatabase);
             Object.keys(allTokens).forEach(token => {
@@ -57,6 +54,12 @@ function loadActiveTokens() {
                     };
                 }
             });
+        }
+        
+        // 추가 동기화 경로
+        if (adminGeneratedTokens) {
+            const adminTokens = JSON.parse(adminGeneratedTokens);
+            ACCESS_TOKENS = { ...ACCESS_TOKENS, ...adminTokens };
         }
         
         console.log('로드된 토큰들:', Object.keys(ACCESS_TOKENS));
@@ -996,7 +999,30 @@ async function checkTokenAuthentication() {
 
 // 토큰 유효성 검사
 function isValidToken(token) {
-    const tokenInfo = ACCESS_TOKENS[token];
+    // 먼저 현재 로드된 토큰에서 확인
+    let tokenInfo = ACCESS_TOKENS[token];
+    
+    // 없으면 관리자 데이터베이스에서 직접 확인
+    if (!tokenInfo) {
+        try {
+            const tokenDatabase = JSON.parse(localStorage.getItem('tokenDatabase') || '{}');
+            if (tokenDatabase[token]) {
+                const dbTokenInfo = tokenDatabase[token];
+                if (dbTokenInfo.status === 'active' && new Date(dbTokenInfo.expires) > new Date()) {
+                    // 즉시 ACCESS_TOKENS에 추가
+                    ACCESS_TOKENS[token] = {
+                        name: dbTokenInfo.name,
+                        role: dbTokenInfo.role,
+                        expires: dbTokenInfo.expires
+                    };
+                    tokenInfo = ACCESS_TOKENS[token];
+                }
+            }
+        } catch (error) {
+            console.log('토큰 데이터베이스 확인 실패:', error);
+        }
+    }
+    
     if (!tokenInfo) return false;
     
     // 만료일 체크
