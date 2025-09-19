@@ -461,12 +461,17 @@ function renderCalendar() {
         
         // 전체 날짜 칸 클릭 이벤트 (휴가 등록용)
         day.addEventListener('click', (e) => {
+            console.log('날짜 클릭:', currentDateStr, '타겟:', e.target.className);
+            
             // 휴가 표시를 클릭한 경우가 아니면 휴가 등록 모달 열기
             if (!e.target.classList.contains('leave-indicator')) {
+                console.log('휴가 등록 모달 열기:', currentDateStr);
                 selectedDates = [currentDateStr];
                 updateSelectedDatesDisplay();
                 updateCalendarSelection();
                 openLeaveModal();
+            } else {
+                console.log('휴가 표시 클릭됨, 등록 모달 열지 않음');
             }
         });
         
