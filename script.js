@@ -883,10 +883,14 @@ function initializeFirebase() {
 
 // 토큰 기반 인증 체크
 function checkTokenAuthentication() {
-    // 이미 인증된 토큰이 있는지 확인
-    const savedToken = sessionStorage.getItem('accessToken');
+    // 세션 스토리지와 로컬 스토리지 둘 다 확인
+    let savedToken = sessionStorage.getItem('accessToken') || localStorage.getItem('accessToken');
+    
     if (savedToken && isValidToken(savedToken)) {
         userToken = savedToken;
+        // 토큰을 양쪽 스토리지에 모두 저장
+        sessionStorage.setItem('accessToken', savedToken);
+        localStorage.setItem('accessToken', savedToken);
         startRealTimeSync();
         return true;
     }
@@ -964,9 +968,13 @@ function attemptTokenAuthentication() {
     if (isValidToken(token)) {
         // 인증 성공
         const tokenInfo = ACCESS_TOKENS[token];
+        // 양쪽 스토리지에 모두 저장 (더 안정적인 유지)
         sessionStorage.setItem('accessToken', token);
         sessionStorage.setItem('userRole', tokenInfo.role);
         sessionStorage.setItem('userName', tokenInfo.name);
+        localStorage.setItem('accessToken', token);
+        localStorage.setItem('userRole', tokenInfo.role);
+        localStorage.setItem('userName', tokenInfo.name);
         
         userToken = token;
         
@@ -1050,9 +1058,13 @@ function logTokenUsage(token) {
 // 로그아웃 함수
 function logout() {
     if (confirm('로그아웃 하시겠습니까?')) {
+        // 양쪽 스토리지에서 모두 제거
         sessionStorage.removeItem('accessToken');
         sessionStorage.removeItem('userRole');
         sessionStorage.removeItem('userName');
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('userRole');
+        localStorage.removeItem('userName');
         if (syncInterval) {
             clearInterval(syncInterval);
         }
