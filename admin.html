@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>휴가 관리 시스템 - 관리자 페이지</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .admin-container {
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        .admin-header {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .token-management {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .token-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        
+        .token-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .token-item {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .token-info {
+            flex: 1;
+        }
+        
+        .token-id {
+            font-family: monospace;
+            background: #e9ecef;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        
+        .token-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .token-status.active {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .token-status.expired {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .token-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .generate-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh;">
+    <div class="admin-container">
+        <div class="admin-header">
+            <h1>🔐 휴가 관리 시스템 관리자</h1>
+            <p>토큰 생성 및 사용자 접근 권한 관리</p>
+        </div>
+
+        <!-- 관리자 인증 -->
+        <div id="adminAuth" style="display: block;">
+            <div style="text-align: center; padding: 50px;">
+                <h3>관리자 인증</h3>
+                <input type="password" id="adminPassword" placeholder="관리자 비밀번호" 
+                       style="padding: 12px; margin: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                <br>
+                <button onclick="authenticateAdmin()" class="generate-btn" style="width: auto; margin-top: 10px;">
+                    관리자 로그인
+                </button>
+                <div id="adminError" style="color: red; margin-top: 10px; display: none;">
+                    잘못된 관리자 비밀번호입니다.
+                </div>
+            </div>
+        </div>
+
+        <!-- 관리자 메인 패널 -->
+        <div id="adminPanel" style="display: none;">
+            <div class="token-management">
+                <!-- 토큰 생성 -->
+                <div class="token-section">
+                    <h3>🎫 새 토큰 생성</h3>
+                    <div class="form-group">
+                        <label>사용자 이름</label>
+                        <input type="text" id="userName" placeholder="예: 김철수">
+                    </div>
+                    <div class="form-group">
+                        <label>권한</label>
+                        <select id="userRole">
+                            <option value="user">일반 사용자</option>
+                            <option value="manager">매니저</option>
+                            <option value="admin">관리자</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>만료일</label>
+                        <input type="date" id="expiryDate">
+                    </div>
+                    <button onclick="generateToken()" class="generate-btn">토큰 생성</button>
+                    
+                    <div id="generatedToken" style="margin-top: 15px; display: none;">
+                        <h4>생성된 토큰:</h4>
+                        <div style="background: #e9ecef; padding: 10px; border-radius: 5px; font-family: monospace; word-break: break-all;" id="newTokenDisplay"></div>
+                        <button onclick="copyToken()" style="margin-top: 10px; padding: 8px 15px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            📋 복사
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 토큰 목록 -->
+                <div class="token-section">
+                    <h3>👥 발급된 토큰 목록</h3>
+                    <div class="token-list" id="tokenList">
+                        <!-- 토큰 목록이 여기에 표시됩니다 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 시스템 통계 -->
+            <div class="token-section">
+                <h3>📊 시스템 현황</h3>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
+                    <div style="background: white; padding: 15px; border-radius: 8px; text-align: center;">
+                        <h4>전체 토큰</h4>
+                        <div style="font-size: 24px; font-weight: bold; color: #007bff;" id="totalTokens">0</div>
+                    </div>
+                    <div style="background: white; padding: 15px; border-radius: 8px; text-align: center;">
+                        <h4>활성 토큰</h4>
+                        <div style="font-size: 24px; font-weight: bold; color: #28a745;" id="activeTokens">0</div>
+                    </div>
+                    <div style="background: white; padding: 15px; border-radius: 8px; text-align: center;">
+                        <h4>만료된 토큰</h4>
+                        <div style="font-size: 24px; font-weight: bold; color: #dc3545;" id="expiredTokens">0</div>
+                    </div>
+                    <div style="background: white; padding: 15px; border-radius: 8px; text-align: center;">
+                        <h4>오늘 접속</h4>
+                        <div style="font-size: 24px; font-weight: bold; color: #ffc107;" id="todayLogins">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

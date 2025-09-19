@@ -1,0 +1,243 @@
+// 관리자 설정
+const ADMIN_PASSWORD = 'admin2025!@#';
+
+// 토큰 저장소 (실제로는 데이터베이스 사용)
+let tokenDatabase = JSON.parse(localStorage.getItem('tokenDatabase') || '{}');
+
+// 페이지 로드 시 초기화
+document.addEventListener('DOMContentLoaded', function() {
+    // Enter 키로 관리자 로그인
+    document.getElementById('adminPassword').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            authenticateAdmin();
+        }
+    });
+    
+    // 기본 만료일 설정 (1년 후)
+    const nextYear = new Date();
+    nextYear.setFullYear(nextYear.getFullYear() + 1);
+    document.getElementById('expiryDate').value = nextYear.toISOString().split('T')[0];
+});
+
+// 관리자 인증
+function authenticateAdmin() {
+    const password = document.getElementById('adminPassword').value;
+    const errorDiv = document.getElementById('adminError');
+    
+    if (password === ADMIN_PASSWORD) {
+        document.getElementById('adminAuth').style.display = 'none';
+        document.getElementById('adminPanel').style.display = 'block';
+        loadTokenList();
+        updateStats();
+    } else {
+        errorDiv.style.display = 'block';
+        document.getElementById('adminPassword').value = '';
+        document.getElementById('adminPassword').focus();
+    }
+}
+
+// 토큰 생성
+function generateToken() {
+    const userName = document.getElementById('userName').value.trim();
+    const userRole = document.getElementById('userRole').value;
+    const expiryDate = document.getElementById('expiryDate').value;
+    
+    if (!userName || !expiryDate) {
+        alert('사용자 이름과 만료일을 입력해주세요.');
+        return;
+    }
+    
+    // 고유 토큰 생성
+    const timestamp = Date.now();
+    const randomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const rolePrefix = userRole.toUpperCase().substring(0, 3);
+    const token = `USR-2025-${rolePrefix}-${randomId}-${timestamp.toString().slice(-6)}`;
+    
+    // 토큰 정보 저장
+    tokenDatabase[token] = {
+        name: userName,
+        role: userRole,
+        expires: expiryDate,
+        created: new Date().toISOString(),
+        lastUsed: null,
+        status: 'active'
+    };
+    
+    // 로컬 스토리지에 저장
+    localStorage.setItem('tokenDatabase', JSON.stringify(tokenDatabase));
+    
+    // 메인 시스템의 토큰 목록도 업데이트
+    updateMainSystemTokens();
+    
+    // 생성된 토큰 표시
+    document.getElementById('newTokenDisplay').textContent = token;
+    document.getElementById('generatedToken').style.display = 'block';
+    
+    // 폼 초기화
+    document.getElementById('userName').value = '';
+    
+    // 목록 새로고침
+    loadTokenList();
+    updateStats();
+    
+    alert(`토큰이 생성되었습니다!\n사용자: ${userName}\n토큰: ${token}`);
+}
+
+// 메인 시스템의 토큰 목록 업데이트
+function updateMainSystemTokens() {
+    // script.js의 ACCESS_TOKENS 객체를 업데이트하기 위해
+    // localStorage에 저장된 토큰 정보를 사용
+    const activeTokens = {};
+    
+    Object.keys(tokenDatabase).forEach(token => {
+        const tokenInfo = tokenDatabase[token];
+        if (tokenInfo.status === 'active' && new Date(tokenInfo.expires) > new Date()) {
+            activeTokens[token] = {
+                name: tokenInfo.name,
+                role: tokenInfo.role,
+                expires: tokenInfo.expires
+            };
+        }
+    });
+    
+    localStorage.setItem('activeTokens', JSON.stringify(activeTokens));
+}
+
+// 토큰 목록 로드
+function loadTokenList() {
+    const tokenList = document.getElementById('tokenList');
+    tokenList.innerHTML = '';
+    
+    const tokens = Object.keys(tokenDatabase).sort((a, b) => 
+        new Date(tokenDatabase[b].created) - new Date(tokenDatabase[a].created)
+    );
+    
+    if (tokens.length === 0) {
+        tokenList.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">발급된 토큰이 없습니다.</p>';
+        return;
+    }
+    
+    tokens.forEach(token => {
+        const tokenInfo = tokenDatabase[token];
+        const isExpired = new Date(tokenInfo.expires) < new Date();
+        const status = isExpired ? 'expired' : tokenInfo.status;
+        
+        const tokenItem = document.createElement('div');
+        tokenItem.className = 'token-item';
+        
+        tokenItem.innerHTML = `
+            <div class="token-info">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <strong>${tokenInfo.name}</strong>
+                    <span class="token-status ${status}">${status === 'active' ? '활성' : '만료'}</span>
+                </div>
+                <div class="token-id">${token}</div>
+                <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                    권한: ${getRoleText(tokenInfo.role)} | 
+                    만료: ${tokenInfo.expires} |
+                    생성: ${new Date(tokenInfo.created).toLocaleDateString()}
+                    ${tokenInfo.lastUsed ? `| 마지막 사용: ${new Date(tokenInfo.lastUsed).toLocaleDateString()}` : ''}
+                </div>
+            </div>
+            <div class="token-actions">
+                ${status === 'active' ? 
+                    `<button class="btn btn-danger" onclick="revokeToken('${token}')">해지</button>` :
+                    `<button class="btn btn-success" onclick="reactivateToken('${token}')">재활성화</button>`
+                }
+                <button class="btn btn-danger" onclick="deleteToken('${token}')">삭제</button>
+            </div>
+        `;
+        
+        tokenList.appendChild(tokenItem);
+    });
+}
+
+// 권한 텍스트 변환
+function getRoleText(role) {
+    switch(role) {
+        case 'admin': return '관리자';
+        case 'manager': return '매니저';
+        case 'user': return '사용자';
+        default: return role;
+    }
+}
+
+// 토큰 해지
+function revokeToken(token) {
+    if (confirm('이 토큰을 해지하시겠습니까?')) {
+        tokenDatabase[token].status = 'revoked';
+        localStorage.setItem('tokenDatabase', JSON.stringify(tokenDatabase));
+        updateMainSystemTokens();
+        loadTokenList();
+        updateStats();
+        alert('토큰이 해지되었습니다.');
+    }
+}
+
+// 토큰 재활성화
+function reactivateToken(token) {
+    if (confirm('이 토큰을 재활성화하시겠습니까?')) {
+        tokenDatabase[token].status = 'active';
+        localStorage.setItem('tokenDatabase', JSON.stringify(tokenDatabase));
+        updateMainSystemTokens();
+        loadTokenList();
+        updateStats();
+        alert('토큰이 재활성화되었습니다.');
+    }
+}
+
+// 토큰 삭제
+function deleteToken(token) {
+    if (confirm('이 토큰을 완전히 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+        delete tokenDatabase[token];
+        localStorage.setItem('tokenDatabase', JSON.stringify(tokenDatabase));
+        updateMainSystemTokens();
+        loadTokenList();
+        updateStats();
+        alert('토큰이 삭제되었습니다.');
+    }
+}
+
+// 토큰 복사
+function copyToken() {
+    const token = document.getElementById('newTokenDisplay').textContent;
+    navigator.clipboard.writeText(token).then(() => {
+        alert('토큰이 클립보드에 복사되었습니다!');
+    }).catch(() => {
+        // 클립보드 API가 지원되지 않는 경우
+        const textArea = document.createElement('textarea');
+        textArea.value = token;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert('토큰이 클립보드에 복사되었습니다!');
+    });
+}
+
+// 통계 업데이트
+function updateStats() {
+    const tokens = Object.keys(tokenDatabase);
+    const activeTokens = tokens.filter(token => {
+        const tokenInfo = tokenDatabase[token];
+        return tokenInfo.status === 'active' && new Date(tokenInfo.expires) > new Date();
+    });
+    const expiredTokens = tokens.filter(token => {
+        const tokenInfo = tokenDatabase[token];
+        return new Date(tokenInfo.expires) < new Date() || tokenInfo.status !== 'active';
+    });
+    
+    // 오늘 로그인한 토큰 수 (실제로는 로그 데이터 필요)
+    const todayLogins = tokens.filter(token => {
+        const tokenInfo = tokenDatabase[token];
+        if (!tokenInfo.lastUsed) return false;
+        const lastUsed = new Date(tokenInfo.lastUsed);
+        const today = new Date();
+        return lastUsed.toDateString() === today.toDateString();
+    }).length;
+    
+    document.getElementById('totalTokens').textContent = tokens.length;
+    document.getElementById('activeTokens').textContent = activeTokens.length;
+    document.getElementById('expiredTokens').textContent = expiredTokens.length;
+    document.getElementById('todayLogins').textContent = todayLogins;
+}

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>연차/월차 관리 시스템</title>
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>직원 연차/월차 관리 시스템</h1>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <div class="current-time" id="currentTime"></div>
+                <button onclick="logout()" style="background: rgba(255,255,255,0.2); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer;">로그아웃</button>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- 직원 관리 섹션 -->
+            <section class="employee-section">
+                <h2>직원 관리</h2>
+                <div class="add-employee">
+                    <input type="text" id="employeeName" placeholder="직원 이름">
+                    <input type="date" id="joinDate" placeholder="입사일">
+                    <button onclick="addEmployee()">직원 추가</button>
+                </div>
+                <div class="employee-summary" id="employeeSummary"></div>
+            </section>
+
+            <!-- 달력 섹션 -->
+            <section class="calendar-section">
+                <h2>휴가 달력 (날짜 클릭으로 휴가 등록)</h2>
+                <div class="calendar-controls">
+                    <button onclick="previousMonth()">◀</button>
+                    <span id="currentMonth"></span>
+                    <button onclick="nextMonth()">▶</button>
+                </div>
+                <div class="selected-info" id="selectedInfo">드래그하여 연속 날짜 선택 또는 클릭하여 단일 날짜 선택</div>
+                <div class="calendar" id="calendar"></div>
+            </section>
+        </div>
+
+        <!-- 휴가 등록 모달 -->
+        <div class="modal" id="leaveModal">
+            <div class="modal-content">
+                <span class="close" onclick="closeLeaveModal()">&times;</span>
+                <h3>휴가 등록</h3>
+                <div class="modal-form">
+                    <div class="form-group">
+                        <label>선택된 날짜:</label>
+                        <span id="selectedDates"></span>
+                    </div>
+                    <div class="form-group">
+                        <label>직원:</label>
+                        <select id="modalEmployee">
+                            <option value="">직원 선택</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>휴가 종류:</label>
+                        <select id="modalLeaveType">
+                            <option value="annual">연차</option>
+                            <option value="monthly">월차</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>휴가 시간:</label>
+                        <select id="modalDuration">
+                            <option value="full">종일</option>
+                            <option value="morning">오전반차</option>
+                            <option value="afternoon">오후반차</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>사유:</label>
+                        <input type="text" id="modalReason" placeholder="휴가 사유">
+                    </div>
+                    <div class="modal-buttons">
+                        <button onclick="registerLeave()">등록</button>
+                        <button onclick="closeLeaveModal()">취소</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 직원 상세 정보 모달 -->
+        <div class="modal" id="employeeDetailModal">
+            <div class="modal-content">
+                <span class="close" onclick="closeEmployeeDetailModal()">&times;</span>
+                <h3 id="employeeDetailTitle">직원 상세 정보</h3>
+                <div class="employee-detail-info" id="employeeDetailInfo"></div>
+                <div class="employee-leave-history" id="employeeLeaveHistory"></div>
+            </div>
+        </div>
+
+        <!-- 휴가 취소 확인 모달 -->
+        <div class="modal" id="leaveCancelModal">
+            <div class="modal-content">
+                <span class="close" onclick="closeLeaveCancelModal()">&times;</span>
+                <h3>휴가 취소</h3>
+                <div id="leaveCancelInfo"></div>
+                <div class="modal-buttons">
+                    <button onclick="confirmCancelLeave()">취소</button>
+                    <button onclick="closeLeaveCancelModal()">닫기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
