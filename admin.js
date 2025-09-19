@@ -6,6 +6,9 @@ let tokenDatabase = JSON.parse(localStorage.getItem('tokenDatabase') || '{}');
 
 // 페이지 로드 시 초기화
 document.addEventListener('DOMContentLoaded', function() {
+    // GitHub의 tokens.js에서 기존 토큰들 로드
+    loadTokensFromGitHub();
+    
     // 최초 실행 시 마스터 관리자 토큰 생성
     initializeMasterToken();
     
@@ -24,6 +27,36 @@ document.addEventListener('DOMContentLoaded', function() {
     nextYear.setFullYear(nextYear.getFullYear() + 1);
     document.getElementById('expiryDate').value = nextYear.toISOString().split('T')[0];
 });
+
+// GitHub의 tokens.js에서 기존 토큰들 로드
+function loadTokensFromGitHub() {
+    try {
+        // tokens.js에서 로드된 전역 토큰들을 로컬 데이터베이스로 가져오기
+        if (window.ACTIVE_TOKENS) {
+            Object.keys(window.ACTIVE_TOKENS).forEach(token => {
+                const tokenInfo = window.ACTIVE_TOKENS[token];
+                
+                // 로컬 데이터베이스에 없으면 추가
+                if (!tokenDatabase[token]) {
+                    tokenDatabase[token] = {
+                        name: tokenInfo.name,
+                        role: tokenInfo.role,
+                        expires: tokenInfo.expires,
+                        created: new Date().toISOString(),
+                        lastUsed: null,
+                        status: 'active'
+                    };
+                }
+            });
+            
+            // 로컬 스토리지 업데이트
+            localStorage.setItem('tokenDatabase', JSON.stringify(tokenDatabase));
+            console.log('GitHub 토큰들을 로컬 데이터베이스로 동기화 완료');
+        }
+    } catch (error) {
+        console.log('GitHub 토큰 로드 실패:', error);
+    }
+}
 
 // 최초 마스터 관리자 토큰 생성
 function initializeMasterToken() {
