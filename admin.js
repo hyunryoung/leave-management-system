@@ -186,19 +186,48 @@ async function initializeMasterToken() {
 }
 
 // 관리자 인증
-function authenticateAdmin() {
+async function authenticateAdmin() {
     const password = document.getElementById('adminPassword').value;
     const errorDiv = document.getElementById('adminError');
     
     if (password === ADMIN_PASSWORD) {
         document.getElementById('adminAuth').style.display = 'none';
         document.getElementById('adminPanel').style.display = 'block';
+        
+        // Firebase에서 최신 토큰 목록 강제 로드
+        await forceLoadFromFirebase();
+        
         loadTokenList();
         updateStats();
     } else {
         errorDiv.style.display = 'block';
         document.getElementById('adminPassword').value = '';
         document.getElementById('adminPassword').focus();
+    }
+}
+
+// Firebase에서 강제로 토큰 로드
+async function forceLoadFromFirebase() {
+    if (!isFirebaseEnabled) return;
+    
+    try {
+        const snapshot = await database.ref('tokens').once('value');
+        const firebaseTokens = snapshot.val() || {};
+        
+        // Firebase 토큰으로 완전히 교체
+        tokenDatabase = { ...firebaseTokens };
+        localStorage.setItem('tokenDatabase', JSON.stringify(tokenDatabase));
+        
+        console.log('🔥 Firebase 강제 동기화 완료:', Object.keys(tokenDatabase));
+        
+        // UI 즉시 업데이트
+        if (document.getElementById('tokenList')) {
+            loadTokenList();
+            updateStats();
+        }
+        
+    } catch (error) {
+        console.log('Firebase 강제 로드 실패:', error);
     }
 }
 

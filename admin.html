@@ -193,7 +193,12 @@
 
                 <!-- 토큰 목록 -->
                 <div class="token-section">
-                    <h3>👥 발급된 토큰 목록</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3>👥 발급된 토큰 목록</h3>
+                        <button onclick="forceLoadFromFirebase()" style="padding: 6px 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            🔄 새로고침
+                        </button>
+                    </div>
                     <div class="token-list" id="tokenList">
                         <!-- 토큰 목록이 여기에 표시됩니다 -->
                     </div>
