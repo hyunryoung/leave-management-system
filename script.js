@@ -711,6 +711,7 @@ function registerLeave() {
         return;
     }
     
+    const employeeId = parseInt(document.getElementById('modalEmployee').value);
     const leaveType = document.getElementById('modalLeaveType').value;
     const leaveDuration = document.getElementById('modalDuration').value;
     const reason = document.getElementById('modalReason').value.trim();
@@ -1199,13 +1200,6 @@ function closeLeaveCancelModal() {
 
 // 휴가 취소 확인
 async function confirmCancelLeave() {
-    // 권한 체크: 매니저 이상만 휴가 취소 가능
-    if (!checkPermission('manager')) {
-        showNoPermissionAlert('휴가 취소 (관리자에게 문의하세요)');
-        closeLeaveCancelModal();
-        return;
-    }
-    
     const modal = document.getElementById('leaveCancelModal');
     const leaveId = modal.dataset.leaveId; // 문자열 ID 사용
     
@@ -1216,6 +1210,16 @@ async function confirmCancelLeave() {
     
     const leave = leaveRecords[leaveIndex];
     const employee = employees.find(emp => emp.id === leave.employeeId);
+    const currentUserName = sessionStorage.getItem('userName') || localStorage.getItem('userName');
+    
+    // 본인 휴가가 아니면 매니저 이상 권한 필요
+    if (employee && employee.name !== currentUserName) {
+        if (!checkPermission('manager')) {
+            showNoPermissionAlert('다른 직원의 휴가 취소 (관리자에게 문의하세요)');
+            closeLeaveCancelModal();
+            return;
+        }
+    }
     
     if (employee) {
         // 휴가 복구
