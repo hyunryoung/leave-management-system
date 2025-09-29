@@ -52,22 +52,52 @@ h1 {
     gap: 30px;
 }
 
-/* ===== 야근 관리 스타일 ===== */
-.overtime-form {
-    display: grid;
-    grid-template-columns: repeat(6, minmax(120px, 1fr)) auto;
-    gap: 10px;
-    align-items: center;
-}
-
-.overtime-list { display: grid; gap: 10px; }
-.overtime-item { padding: 12px 14px; border: 1px solid #eee; border-radius: 10px; background: #fff; }
-.overtime-item-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
-.overtime-summary-card { border: 1px solid #eee; border-radius: 10px; padding: 14px; background: #fff; }
-.rank-gold { color: #d4af37; }
-.rank-silver { color: #9e9e9e; }
-.rank-bronze { color: #cd7f32; }
-.overtime-day.has-overtime { background: #fff8e1; }
+/* ===== 야근 관리 스타일 (새 폴더 UI) ===== */
+.overtime-section{max-width:1200px;margin:0 auto}
+.overtime-header{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#ff6b6b 0%,#c92a2a 100%);color:#fff;padding:20px;border-radius:10px;margin-bottom:30px}
+.month-selector{display:flex;align-items:center;gap:20px}
+.month-selector button{background:rgba(255,255,255,.2);border:none;color:#fff;padding:8px 12px;border-radius:5px;cursor:pointer;font-size:18px;transition:background .3s}
+.month-selector button:hover{background:rgba(255,255,255,.3)}
+#currentOvertimeMonth{font-size:1.3rem;font-weight:bold}
+.overtime-stats{display:flex;gap:30px}
+.stat-item{text-align:center}
+.stat-label{font-size:.9rem;opacity:.9;display:block}
+.stat-value{font-size:1.5rem;font-weight:bold;display:block;margin-top:5px}
+.overtime-form-section{background:#fff;border-radius:15px;padding:30px;margin-bottom:30px;box-shadow:0 5px 15px rgba(0,0,0,.08);border:1px solid #e9ecef}
+.overtime-form-section h3{color:#495057;margin-bottom:20px;font-size:1.3rem;border-bottom:2px solid #ff6b6b;padding-bottom:10px}
+.overtime-form{display:flex;flex-direction:column;gap:20px}
+.overtime-buttons{display:flex;justify-content:flex-end;margin-top:20px;padding-top:20px;border-top:1px solid #e9ecef}
+.overtime-buttons button{background:linear-gradient(135deg,#ff6b6b 0%,#c92a2a 100%);color:#fff;border:none;padding:12px 25px;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;transition:all .3s}
+.overtime-buttons button:hover{transform:translateY(-2px);box-shadow:0 5px 15px rgba(255,107,107,.3)}
+.overtime-calendar-section{background:#fff;border-radius:15px;padding:30px;margin-bottom:30px;box-shadow:0 5px 15px rgba(0,0,0,.08)}
+.overtime-calendar-section h3{color:#495057;margin-bottom:20px;font-size:1.3rem;border-bottom:2px solid #ff6b6b;padding-bottom:10px}
+.overtime-calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.overtime-day{cursor:pointer;transition:all .3s}
+.overtime-day:hover{background:#ffe3e3!important;transform:scale(1.05)}
+.overtime-day.has-overtime{background:#fff5f5;border:2px solid #ff6b6b}
+.overtime-info{display:flex;justify-content:space-around;margin-top:5px;font-size:11px}
+.overtime-count{background:#ff6b6b;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold}
+.overtime-hours{background:#ffa94d;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold}
+.overtime-list-section{background:#fff;border-radius:15px;padding:30px;margin-bottom:30px;box-shadow:0 5px 15px rgba(0,0,0,.08)}
+.overtime-list-section h3{color:#495057;margin-bottom:20px;font-size:1.3rem;border-bottom:2px solid #ff6b6b;padding-bottom:10px}
+.overtime-filters{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding:15px;background:#f8f9fa;border-radius:8px}
+.overtime-filters select{padding:10px 15px;border:2px solid #e9ecef;border-radius:5px;font-size:1rem;background:#fff;cursor:pointer}
+.export-btn{background:#20c997;color:#fff;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;font-weight:600;transition:all .3s}
+.export-btn:hover{background:#12b886;transform:translateY(-2px)}
+.overtime-list{max-height:500px;overflow-y:auto}
+.overtime-item{background:#f8f9fa;border:1px solid #e9ecef;border-radius:10px;padding:20px;margin-bottom:15px;transition:all .3s}
+.overtime-item:hover{background:#e9ecef;transform:translateX(5px)}
+.overtime-item-header{display:flex;justify-content:space-between;margin-bottom:10px}
+.overtime-item-date{font-weight:bold;color:#495057;font-size:1.1rem}
+.overtime-item-employee{background:#ff6b6b;color:#fff;padding:4px 12px;border-radius:15px;font-weight:600}
+.overtime-item-details{display:flex;gap:20px;margin-bottom:10px}
+.overtime-time{color:#6c757d;font-size:.95rem}
+.overtime-duration{background:#ffa94d;color:#fff;padding:4px 10px;border-radius:5px;font-weight:bold;font-size:.9rem}
+.overtime-reason{color:#6c757d;font-style:italic;margin-top:10px;padding:10px;background:#fff;border-radius:5px}
+.overtime-item-actions{display:flex;gap:10px;margin-top:15px;justify-content:flex-end}
+.btn-edit,.btn-delete{padding:6px 15px;border:none;border-radius:5px;cursor:pointer;font-size:.9rem}
+.btn-edit{background:#51cf66;color:#fff}
+.btn-delete{background:#ff6b6b;color:#fff}
 
 /* HR 탭은 전체 너비 사용 */
 #hrTab {

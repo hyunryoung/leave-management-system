@@ -1207,6 +1207,167 @@ function closeLeaveCancelModal() {
     delete modal.dataset.leaveId;
 }
 
+// 휴가 수정 모달 열기
+function openLeaveEditModal() {
+    const cancelModal = document.getElementById('leaveCancelModal');
+    const leaveId = cancelModal.dataset.leaveId;
+
+    if (!leaveId) return;
+
+    const leave = leaveRecords.find(record => record.id.toString() === leaveId.toString());
+    if (!leave) return;
+
+    const employee = employees.find(emp => emp.id === leave.employeeId);
+    if (!employee) return;
+
+    // 권한 체크
+    const currentUserName = sessionStorage.getItem('userName') || localStorage.getItem('userName');
+    if (employee.name !== currentUserName) {
+        if (!checkPermission('manager')) {
+            showNoPermissionAlert('다른 직원의 휴가 수정');
+            return;
+        }
+    }
+
+    // 취소 모달 닫기
+    closeLeaveCancelModal();
+
+    // 수정 모달 열기
+    const editModal = document.getElementById('leaveEditModal');
+
+    // 폼에 기존 데이터 채우기
+    document.getElementById('editEmployeeName').value = employee.name;
+    document.getElementById('editLeaveDate').value = leave.startDate;
+    document.getElementById('editLeaveType').value = leave.type;
+    document.getElementById('editDuration').value = leave.duration;
+    document.getElementById('editReason').value = leave.reason || '';
+
+    // 1년 미만/이상 직원에 따른 휴가 종류 제한 (휴가/병결은 항상 가능)
+    const today = new Date();
+    const joinDate = new Date(employee.joinDate);
+    const yearsOfService = Math.floor((today - joinDate) / (1000 * 60 * 60 * 24 * 365));
+
+    const leaveTypeSelect = document.getElementById('editLeaveType');
+    if (yearsOfService < 1) {
+        // 1년 미만: 월차 + 휴가/병결
+        leaveTypeSelect.innerHTML = `
+            <option value="monthly">월차</option>
+            <option value="vacation">휴가 (차감없음)</option>
+            <option value="sick">병결 (차감없음)</option>
+        `;
+    } else {
+        // 1년 이상: 연차 + 휴가/병결
+        leaveTypeSelect.innerHTML = `
+            <option value="annual">연차</option>
+            <option value="vacation">휴가 (차감없음)</option>
+            <option value="sick">병결 (차감없음)</option>
+        `;
+    }
+    leaveTypeSelect.value = leave.type;
+
+    // 수정할 휴가 ID를 모달에 저장
+    editModal.dataset.leaveId = leaveId;
+    editModal.style.display = 'block';
+}
+
+// 휴가 수정 모달 닫기
+function closeLeaveEditModal() {
+    const modal = document.getElementById('leaveEditModal');
+    modal.style.display = 'none';
+    delete modal.dataset.leaveId;
+}
+
+// 휴가 수정 저장
+async function saveLeaveEdit() {
+    const modal = document.getElementById('leaveEditModal');
+    const leaveId = modal.dataset.leaveId;
+
+    if (!leaveId) return;
+
+    const leaveIndex = leaveRecords.findIndex(record => record.id.toString() === leaveId.toString());
+    if (leaveIndex === -1) return;
+
+    const oldLeave = leaveRecords[leaveIndex];
+    const employee = employees.find(emp => emp.id === oldLeave.employeeId);
+    if (!employee) return;
+
+    // 새 데이터 가져오기
+    const newDate = document.getElementById('editLeaveDate').value;
+    const newType = document.getElementById('editLeaveType').value;
+    const newDuration = document.getElementById('editDuration').value;
+    const newReason = document.getElementById('editReason').value.trim();
+
+    if (!newDate) {
+        alert('날짜를 선택해주세요.');
+        return;
+    }
+
+    // 기존 휴가 일수 복구 (휴가/병결 제외)
+    if (oldLeave.type === 'annual') {
+        employee.usedAnnual -= oldLeave.days;
+    } else if (oldLeave.type === 'monthly') {
+        employee.usedMonthly -= oldLeave.days;
+    }
+
+    // 새 휴가 일수 계산
+    const newDays = (newDuration === 'morning' || newDuration === 'afternoon') ? 0.5 : 1;
+
+    // 잔여 휴가 확인 (휴가/병결 제외)
+    if (newType === 'annual') {
+        if (employee.annualLeave - employee.usedAnnual < newDays) {
+            // 기존 휴가 일수 다시 차감 (롤백)
+            if (oldLeave.type === 'annual') {
+                employee.usedAnnual += oldLeave.days;
+            } else if (oldLeave.type === 'monthly') {
+                employee.usedMonthly += oldLeave.days;
+            }
+            alert('연차가 부족합니다.');
+            return;
+        }
+        employee.usedAnnual += newDays;
+    } else if (newType === 'monthly') {
+        if (employee.monthlyLeave - employee.usedMonthly < newDays) {
+            // 기존 휴가 일수 다시 차감 (롤백)
+            if (oldLeave.type === 'annual') {
+                employee.usedAnnual += oldLeave.days;
+            } else if (oldLeave.type === 'monthly') {
+                employee.usedMonthly += oldLeave.days;
+            }
+            alert('월차가 부족합니다.');
+            return;
+        }
+        employee.usedMonthly += newDays;
+    }
+    // vacation과 sick은 차감하지 않음
+
+    // 휴가 기록 업데이트
+    leaveRecords[leaveIndex] = {
+        ...oldLeave,
+        type: newType,
+        duration: newDuration,
+        startDate: newDate,
+        endDate: newDate,
+        days: newDays,
+        reason: newReason,
+        modifiedDate: new Date().toISOString(),
+        modifiedBy: sessionStorage.getItem('userName') || '알 수 없음'
+    };
+
+    // Firebase에 즉시 저장
+    if (isFirebaseEnabled) {
+        await saveLeaveRecord(leaveRecords[leaveIndex]);
+    }
+
+    saveData();
+
+    // UI 업데이트
+    renderEmployeeSummary();
+    renderCalendar();
+
+    alert('휴가가 수정되었습니다.');
+    closeLeaveEditModal();
+}
+
 // 휴가 취소 확인
 async function confirmCancelLeave() {
     const modal = document.getElementById('leaveCancelModal');

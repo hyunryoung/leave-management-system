@@ -58,53 +58,91 @@
                 </section>
             </div>
 
-            <!-- 야근 관리 탭 -->
+            <!-- 야근 관리 탭 (새 폴더 UI 반영) -->
             <div id="overtimeTab" class="tab-content">
-                <section class="overtime-form-section">
-                    <h2>야근 기록 추가</h2>
-                    <div class="overtime-form">
-                        <input type="date" id="overtimeDate">
-                        <select id="overtimeEmployee"></select>
-                        <input type="time" id="overtimeStartTime" value="18:00">
-                        <input type="time" id="overtimeEndTime" value="21:00">
-                        <input type="text" id="overtimeReason" placeholder="사유 (선택)">
-                        <button onclick="addOvertimeRecord()">추가</button>
-                    </div>
-                </section>
-
-                <section class="overtime-calendar-section">
-                    <h2>야근 달력</h2>
-                    <div class="calendar-header-controls">
-                        <button onclick="previousOvertimeMonth()">◀</button>
-                        <span id="currentOvertimeMonth"></span>
-                        <button onclick="nextOvertimeMonth()">▶</button>
-                    </div>
-                    <div id="overtimeCalendar" class="calendar-grid"></div>
-                </section>
-
-                <section class="overtime-stats-section">
-                    <h2>월간 야근 통계</h2>
-                    <div class="overtime-stats">
-                        <div class="stat-card">
-                            <h3>총 야근 시간</h3>
-                            <div id="totalOvertimeHours" class="stat-value">0시간</div>
+                <section class="overtime-section">
+                    <h2>⏰ 야근 관리</h2>
+                    
+                    <!-- 월 선택 및 통계 -->
+                    <div class="overtime-header">
+                        <div class="month-selector">
+                            <button onclick="previousOvertimeMonth()">◀</button>
+                            <span id="currentOvertimeMonth"></span>
+                            <button onclick="nextOvertimeMonth()">▶</button>
                         </div>
-                        <div class="stat-card">
-                            <h3>야근 참여 인원</h3>
-                            <div id="totalOvertimePeople" class="stat-value">0명</div>
+                        <div class="overtime-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">총 야근 시간:</span>
+                                <span class="stat-value" id="totalOvertimeHours">0시간</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">야근 인원:</span>
+                                <span class="stat-value" id="totalOvertimePeople">0명</span>
+                            </div>
                         </div>
                     </div>
-                </section>
 
-                <section class="overtime-list-section">
-                    <div class="overtime-list-header">
-                        <h2>야근 목록</h2>
-                        <select id="overtimeFilterEmployee" onchange="filterOvertimeRecords()">
-                            <option value="">전체 직원</option>
-                        </select>
-                        <button onclick="exportOvertimeToExcel()">엑셀로 내보내기</button>
+                    <!-- 야근 입력 폼 -->
+                    <div class="overtime-form-section">
+                        <h3>야근 기록 추가</h3>
+                        <div class="overtime-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>날짜:</label>
+                                    <input type="date" id="overtimeDate">
+                                </div>
+                                <div class="form-group">
+                                    <label>직원:</label>
+                                    <select id="overtimeEmployee">
+                                        <option value="">직원 선택</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>시작 시간:</label>
+                                    <input type="time" id="overtimeStartTime" value="18:00">
+                                </div>
+                                <div class="form-group">
+                                    <label>종료 시간:</label>
+                                    <input type="time" id="overtimeEndTime" value="21:00">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group full-width">
+                                    <label>야근 사유:</label>
+                                    <input type="text" id="overtimeReason" placeholder="야근 사유를 입력하세요">
+                                </div>
+                            </div>
+                            <div class="overtime-buttons">
+                                <button onclick="addOvertimeRecord()">야근 기록 추가</button>
+                            </div>
+                        </div>
                     </div>
-                    <div id="overtimeList" class="overtime-list"></div>
+
+                    <!-- 월별 야근 달력 -->
+                    <div class="overtime-calendar-section">
+                        <h3>월별 야근 현황</h3>
+                        <div class="overtime-calendar" id="overtimeCalendar"></div>
+                    </div>
+
+                    <!-- 야근 목록 -->
+                    <div class="overtime-list-section">
+                        <h3>야근 기록 목록</h3>
+                        <div class="overtime-filters">
+                            <select id="overtimeFilterEmployee" onchange="filterOvertimeRecords()">
+                                <option value="">전체 직원</option>
+                            </select>
+                            <button onclick="exportOvertimeToExcel()" class="export-btn">📊 엑셀 내보내기</button>
+                        </div>
+                        <div class="overtime-list" id="overtimeList"></div>
+                    </div>
+
+                    <!-- 직원별 야근 통계 -->
+                    <div class="overtime-summary-section">
+                        <h3>직원별 야근 통계</h3>
+                        <div class="overtime-summary" id="overtimeSummary"></div>
+                    </div>
                 </section>
             </div>
 
@@ -251,8 +289,51 @@
                 <h3>휴가 취소</h3>
                 <div id="leaveCancelInfo"></div>
                 <div class="modal-buttons">
+                    <button onclick="openLeaveEditModal()">수정</button>
                     <button onclick="confirmCancelLeave()">취소</button>
                     <button onclick="closeLeaveCancelModal()">닫기</button>
+                </div>
+            </div>
+        </div>
+        <!-- 휴가 수정 모달 -->
+        <div class="modal" id="leaveEditModal">
+            <div class="modal-content">
+                <span class="close" onclick="closeLeaveEditModal()">&times;</span>
+                <h3>휴가 수정</h3>
+                <div class="modal-form">
+                    <div class="form-group">
+                        <label>직원:</label>
+                        <input type="text" id="editEmployeeName" readonly style="background: #f8f9fa;">
+                    </div>
+                    <div class="form-group">
+                        <label>날짜:</label>
+                        <input type="date" id="editLeaveDate">
+                    </div>
+                    <div class="form-group">
+                        <label>휴가 종류:</label>
+                        <select id="editLeaveType">
+                            <option value="annual">연차</option>
+                            <option value="monthly">월차</option>
+                            <option value="vacation">휴가 (차감없음)</option>
+                            <option value="sick">병결 (차감없음)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>휴가 시간:</label>
+                        <select id="editDuration">
+                            <option value="full">종일</option>
+                            <option value="morning">오전반차</option>
+                            <option value="afternoon">오후반차</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>사유:</label>
+                        <input type="text" id="editReason" placeholder="휴가 사유">
+                    </div>
+                    <div class="modal-buttons">
+                        <button onclick="saveLeaveEdit()">저장</button>
+                        <button onclick="closeLeaveEditModal()">취소</button>
+                    </div>
                 </div>
             </div>
         </div>
