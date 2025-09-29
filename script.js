@@ -1247,9 +1247,10 @@ function initializeFirebase() {
                     isFirebaseEnabled = true;
                     console.log(`Firebase 인증 성공 - 이메일: ${email}, 역할: ${role}`);
                     
-                    // 관리자/매니저면 HR 복호화 키 입력 요청
+                    // 관리자/매니저면 HR 복호화 키 준비 (필요시에만 입력)
                     if (role === 'admin' || role === 'manager') {
-                        await promptAndDeriveKey();
+                        // 세션에 키가 없을 때만 입력 요청 (자동으로 처리)
+                        console.log('🔐 HR 암호화 키 준비됨 (필요시 자동 입력 요청)');
                     }
                     
                     // 앱 초기화
@@ -2054,6 +2055,11 @@ let SESSION_CRYPTO_KEY = null;
 
 // 관리자용 복호화 비밀번호 입력 및 키 파생
 async function promptAndDeriveKey() {
+    // 이미 세션에 키가 있으면 재사용
+    if (SESSION_CRYPTO_KEY && sessionStorage.getItem('hr_key_exists')) {
+        return SESSION_CRYPTO_KEY;
+    }
+    
     const pass = prompt('🔐 HR 복호화 비밀번호를 입력하세요 (세션에만 저장)\n\n⚠️ 이 비밀번호는 팀 내부에서만 공유하세요.');
     if (!pass) return null;
     
@@ -2082,6 +2088,7 @@ async function promptAndDeriveKey() {
         );
         
         sessionStorage.setItem('hr_key_exists', '1'); // 플래그만 보관
+        sessionStorage.setItem('hr_key_timestamp', Date.now()); // 생성 시간
         console.log('🔐 HR 복호화 키 생성 완료 (세션에만 저장)');
         return SESSION_CRYPTO_KEY;
     } catch (error) {
