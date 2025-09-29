@@ -3024,3 +3024,46 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// ===== 초과근무 관련 스텁 함수들 (기능 비활성화) =====
+// 나중에 초과근무 기능 구현 시 활성화 필요
+
+// 초과근무 달력 렌더링 (스텁)
+function renderOvertimeCalendar() {
+    console.log('초과근무 달력 기능은 현재 비활성화 상태입니다.');
+}
+
+// 초과근무 목록 렌더링 (스텁)
+function renderOvertimeList() {
+    console.log('초과근무 목록 기능은 현재 비활성화 상태입니다.');
+}
+
+// 초과근무 요약 렌더링 (스텁)
+function renderOvertimeSummary() {
+    console.log('초과근무 요약 기능은 현재 비활성화 상태입니다.');
+}
+
+// 초과근무 기록 추가 (스텁)
+function addOvertimeRecord() {
+    alert('초과근무 기록 기능은 현재 비활성화 상태입니다.');
+}
+
+// 초과근무 직원 드롭다운 업데이트 (스텁)
+function updateOvertimeEmployeeDropdown() {
+    console.log('초과근무 직원 드롭다운 기능은 현재 비활성화 상태입니다.');
+}
+
+// 이전 달로 이동 (초과근무)
+function previousOvertimeMonth() {
+    console.log('초과근무 이전 달 기능은 현재 비활성화 상태입니다.');
+}
+
+// 다음 달로 이동 (초과근무)
+function nextOvertimeMonth() {
+    console.log('초과근무 다음 달 기능은 현재 비활성화 상태입니다.');
+}
+
+// 초과근무 필터링 (스텁)
+function filterOvertimeRecords() {
+    console.log('초과근무 필터 기능은 현재 비활성화 상태입니다.');
+}
