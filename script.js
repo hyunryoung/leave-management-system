@@ -250,11 +250,11 @@ function calculateEmployeeLeaves(employee) {
     
     // 1년 미만 직원 - 월차만 지급
     if (yearsOfService < 1) {
-        // 입사일 기준으로 매달 1개 월차 (입사한 달부터 시작)
-        const monthsSinceJoin = (today.getFullYear() - joinDate.getFullYear()) * 12 + 
-                              (today.getMonth() - joinDate.getMonth()) + 
-                              (today.getDate() >= joinDate.getDate() ? 1 : 0);
-        employee.monthlyLeave = Math.max(0, monthsSinceJoin);
+        // 입사 후 '완료된' 개월 수 만큼만 월차 생성 (입사달 제외, 매 월 기념일에 1개)
+        let completedMonths = (today.getFullYear() - joinDate.getFullYear()) * 12
+                            + (today.getMonth() - joinDate.getMonth());
+        if (today.getDate() < joinDate.getDate()) completedMonths -= 1; // 기념일 이전이면 아직 해당 달 미지급
+        employee.monthlyLeave = Math.max(0, completedMonths);
         employee.annualLeave = 0; // 1년 미만은 연차 없음
         employee.usedAnnual = 0;
     } 
