@@ -1247,6 +1247,11 @@ function initializeFirebase() {
                     isFirebaseEnabled = true;
                     console.log(`Firebase 인증 성공 - 이메일: ${email}, 역할: ${role}`);
                     
+                    // 관리자/매니저면 HR 복호화 키 입력 요청
+                    if (role === 'admin' || role === 'manager') {
+                        await promptAndDeriveKey();
+                    }
+                    
                     // 앱 초기화
                     await initializeApp();
                 } else {
@@ -2042,7 +2047,99 @@ async function attemptFirebaseGoogleLogin() {
     }
 }
 
-// ===== 보안 암호화 기능 =====
+// ===== 무료 Spark 플랜 보안 암호화 기능 =====
+
+// 세션에 저장할 전역 키
+let SESSION_CRYPTO_KEY = null;
+
+// 관리자용 복호화 비밀번호 입력 및 키 파생
+async function promptAndDeriveKey() {
+    const pass = prompt('🔐 HR 복호화 비밀번호를 입력하세요 (세션에만 저장)\n\n⚠️ 이 비밀번호는 팀 내부에서만 공유하세요.');
+    if (!pass) return null;
+    
+    try {
+        // 고정 솔트(공개되어도 괜찮음). 나중에 교체 가능
+        const salt = new TextEncoder().encode('hrms-v1-salt-2025');
+        const baseKey = await crypto.subtle.importKey(
+            'raw', 
+            new TextEncoder().encode(pass), 
+            'PBKDF2', 
+            false, 
+            ['deriveKey']
+        );
+        
+        SESSION_CRYPTO_KEY = await crypto.subtle.deriveKey(
+            { 
+                name: 'PBKDF2', 
+                salt: salt, 
+                iterations: 210000, 
+                hash: 'SHA-256' 
+            },
+            baseKey,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt', 'decrypt']
+        );
+        
+        sessionStorage.setItem('hr_key_exists', '1'); // 플래그만 보관
+        console.log('🔐 HR 복호화 키 생성 완료 (세션에만 저장)');
+        return SESSION_CRYPTO_KEY;
+    } catch (error) {
+        console.error('키 파생 실패:', error);
+        alert('비밀번호 처리에 실패했습니다. 다시 시도해주세요.');
+        return null;
+    }
+}
+
+// AES-GCM 암호화 (웹크립토 API 사용)
+async function aesEncrypt(plaintext) {
+    if (!SESSION_CRYPTO_KEY) {
+        await promptAndDeriveKey();
+        if (!SESSION_CRYPTO_KEY) return null;
+    }
+    
+    try {
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const ct = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv },
+            SESSION_CRYPTO_KEY,
+            new TextEncoder().encode(plaintext)
+        );
+        
+        return { 
+            v: 1, 
+            iv: btoa(String.fromCharCode(...iv)), 
+            ciphertext: btoa(String.fromCharCode(...new Uint8Array(ct))) 
+        };
+    } catch (error) {
+        console.error('AES 암호화 실패:', error);
+        return null;
+    }
+}
+
+// AES-GCM 복호화 (웹크립토 API 사용)
+async function aesDecrypt(encObj) {
+    if (!SESSION_CRYPTO_KEY) {
+        await promptAndDeriveKey();
+        if (!SESSION_CRYPTO_KEY) return '';
+    }
+    
+    try {
+        const iv = Uint8Array.from(atob(encObj.iv), c => c.charCodeAt(0));
+        const ct = Uint8Array.from(atob(encObj.ciphertext), c => c.charCodeAt(0));
+        const ptBuf = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv }, 
+            SESSION_CRYPTO_KEY, 
+            ct
+        );
+        return new TextDecoder().decode(ptBuf);
+    } catch (error) {
+        console.error('AES 복호화 실패:', error);
+        return '';
+    }
+}
+
+// ===== 기존 보안 암호화 기능 (하위 호환) =====
 
 // 강력한 AES-256 스타일 암호화 (운영급)
 function encryptSensitiveData(data, masterKey = null) {
@@ -2171,7 +2268,62 @@ function maskSensitiveData(data, type) {
     }
 }
 
-// ===== HR 데이터 마이그레이션 =====
+// ===== HR 데이터 마이그레이션 (AES-GCM) =====
+
+// 기존 데이터를 AES-GCM 포맷으로 마이그레이션 (관리자 전용)
+async function migrateOldToAes() {
+    if (!SESSION_CRYPTO_KEY) {
+        await promptAndDeriveKey();
+        if (!SESSION_CRYPTO_KEY) {
+            alert('복호화 키가 필요합니다.');
+            return;
+        }
+    }
+    
+    console.log('🔄 기존 HR 데이터를 AES-GCM 포맷으로 마이그레이션 시작...');
+    
+    const snap = await database.ref('employees').once('value');
+    const map = snap.val() || {};
+    const list = Array.isArray(map) ? map : Object.values(map);
+    let count = 0;
+    
+    for (const emp of list) {
+        const hr = emp?.hrData; 
+        if (!hr) continue;
+        if (hr.enc) continue; // 이미 새 포맷
+        
+        try {
+            const phone = hr.phone ? decryptSensitiveData(hr.phone) : '';
+            const ssn = hr.ssn ? decryptSensitiveData(hr.ssn) : '';
+            const address = hr.address ? decryptSensitiveData(hr.address) : '';
+            
+            hr.enc = {
+                phone: phone ? await aesEncrypt(phone) : null,
+                ssn: ssn ? await aesEncrypt(ssn) : null,
+                address: address ? await aesEncrypt(address) : null
+            };
+            
+            // 평문/구포맷 필드 제거
+            delete hr.phone; 
+            delete hr.ssn; 
+            delete hr.address;
+            
+            await database.ref(`employees/${emp.id}/hrData`).set(hr);
+            console.log(`${emp.name} AES-GCM 마이그레이션 완료`);
+            count++;
+        } catch(e) { 
+            console.log(`${emp?.name} 마이그레이션 건너뜀:`, e); 
+        }
+    }
+    
+    alert(`AES-GCM 포맷으로 재암호화 완료: ${count}명`);
+    console.log(`🔄 AES-GCM 마이그레이션 완료: ${count}명`);
+    
+    // UI 새로고침
+    renderHREmployeeList();
+}
+
+// ===== 기존 HR 데이터 마이그레이션 (호환성) =====
 
 // 관리자 전용. 로그인 후 콘솔에서 한 번 호출.
 async function migrateHRDataKeys(daysBack = 30) {
@@ -2283,7 +2435,7 @@ function updateHREmployeeDropdown() {
 }
 
 // 직원 HR 데이터 로드
-function loadEmployeeHRData() {
+async function loadEmployeeHRData() {
     const employeeId = parseInt(document.getElementById('hrEmployeeSelect').value);
     
     if (!employeeId) {
@@ -2301,16 +2453,22 @@ function loadEmployeeHRData() {
     document.getElementById('hrJoinDate').value = employee.joinDate || '';
     document.getElementById('hrLeaveDate').value = hrData.leaveDate || '';
     
-    // 암호화된 데이터 복호화
-    if (hrData.encrypted) {
+    // AES-GCM 복호화된 데이터 로드
+    if (hrData.enc) {
+        // 새 AES-GCM 포맷
+        document.getElementById('hrPhone').value = hrData.enc.phone ? await aesDecrypt(hrData.enc.phone) : '';
+        document.getElementById('hrSsn').value = hrData.enc.ssn ? await aesDecrypt(hrData.enc.ssn) : '';
+        document.getElementById('hrAddress').value = hrData.enc.address ? await aesDecrypt(hrData.enc.address) : '';
+    } else if (hrData.encrypted) {
+        // 기존 암호화 데이터 (하위 호환)
         document.getElementById('hrPhone').value = hrData.phone ? decryptSensitiveData(hrData.phone) : '';
         document.getElementById('hrSsn').value = hrData.ssn ? decryptSensitiveData(hrData.ssn) : '';
         document.getElementById('hrAddress').value = hrData.address ? decryptSensitiveData(hrData.address) : '';
     } else {
-        // 기존 암호화되지 않은 데이터 (하위 호환)
-        document.getElementById('hrPhone').value = hrData.phone || '';
-        document.getElementById('hrSsn').value = hrData.ssn || '';
-        document.getElementById('hrAddress').value = hrData.address || '';
+        // 과거 데이터 호환(없으면 빈칸)
+        document.getElementById('hrPhone').value = '';
+        document.getElementById('hrSsn').value = '';
+        document.getElementById('hrAddress').value = '';
     }
     
     document.getElementById('hrDepartment').value = hrData.department || '';
@@ -2400,17 +2558,19 @@ async function saveEmployeeHRData() {
         employees.push(employee);
     }
     
-    // HR 데이터 저장 (민감정보 암호화)
+    // HR 데이터 저장 (AES-GCM 암호화)
     employee.hrData = {
         leaveDate: leaveDate,
-        phone: phone ? encryptSensitiveData(phone) : '', // 전화번호 암호화
-        ssn: ssn ? encryptSensitiveData(ssn) : '', // 주민번호 암호화
+        encrypted: true,        // 평문은 안 둡니다
+        enc: {
+            phone: phone ? await aesEncrypt(phone) : null,
+            ssn: ssn ? await aesEncrypt(ssn) : null,
+            address: address ? await aesEncrypt(address) : null
+        },
         department: department,
         position: position,
-        address: address ? encryptSensitiveData(address) : '', // 주소 암호화
         notes: notes,
-        lastUpdated: new Date().toISOString(),
-        encrypted: true // 암호화 플래그
+        lastUpdated: new Date().toISOString()
     };
     
     // 보안 강화된 Firebase + 로컬 백업으로 저장
@@ -2514,7 +2674,7 @@ function renderHREmployeeList() {
                 </div>
                 <div class="hr-info-item">
                     <span class="hr-info-label">연락처:</span>
-                    <span>${hrData.phone ? (hrData.encrypted ? maskSensitiveData(decryptSensitiveData(hrData.phone), 'phone') : maskSensitiveData(hrData.phone, 'phone')) : '미등록'}</span>
+                    <span id="phone-${employee.id}">로딩중...</span>
                 </div>
                 ${hrData.leaveDate ? `
                 <div class="hr-info-item">
@@ -2544,6 +2704,22 @@ function renderHREmployeeList() {
         });
         
         container.appendChild(card);
+        
+        // 비동기로 민감정보 복호화 및 표시
+        if (hrData.enc && hrData.enc.phone) {
+            aesDecrypt(hrData.enc.phone).then(phone => {
+                const phoneElement = document.getElementById(`phone-${employee.id}`);
+                if (phoneElement) {
+                    phoneElement.textContent = phone ? maskSensitiveData(phone, 'phone') : '미등록';
+                }
+            }).catch(() => {
+                const phoneElement = document.getElementById(`phone-${employee.id}`);
+                if (phoneElement) phoneElement.textContent = '복호화 실패';
+            });
+        } else {
+            const phoneElement = document.getElementById(`phone-${employee.id}`);
+            if (phoneElement) phoneElement.textContent = '미등록';
+        }
     });
 }
 
