@@ -72,7 +72,9 @@ async function createUser(email, password, role) {
     
     // 🔽 여기에 실제 Google 계정 이메일을 추가하세요 🔽
     await setRole('shr941207@gmail.com', 'admin');
-    await setRole('rhdudgok@gmail.com', 'admin');
+    
+    // Google 계정이 아직 없다면 임시 비밀번호로 생성
+    await createUser('rhdudgok@gmail.com', 'temp123456', 'admin');
     // await setRole('manager_email@company.com', 'manager');
     // await setRole('employee_email@gmail.com', 'user');
     
