@@ -257,6 +257,9 @@ function calculateEmployeeLeaves(employee) {
         employee.monthlyLeave = Math.max(0, completedMonths);
         employee.annualLeave = 0; // 1년 미만은 연차 없음
         employee.usedAnnual = 0;
+        
+        // 디버깅 로그 추가
+        console.log(`${employee.name} 월차 계산: 입사일 ${employee.joinDate}, 근무일수 ${daysDiff}일 (${yearsOfService}년), 완료개월 ${completedMonths}, 총월차 ${employee.monthlyLeave}, 사용 ${employee.usedMonthly}, 잔여 ${employee.monthlyLeave - employee.usedMonthly}`);
     } 
     // 1년 이상 직원 - 연차만 지급 (매년 리셋)
     else {
