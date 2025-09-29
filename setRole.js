@@ -69,9 +69,16 @@ async function createUser(email, password, role) {
     
     // Google 로그인 사용자에게 역할 부여 (이메일만으로)
     // 먼저 웹에서 Google 로그인을 한 번 해서 사용자가 생성되어야 함
+    
+    // 🔽 여기에 실제 Google 계정 이메일을 추가하세요 🔽
     // await setRole('your_google_email@gmail.com', 'admin');
     // await setRole('manager_email@company.com', 'manager');
     // await setRole('employee_email@gmail.com', 'user');
+    
+    // 예시:
+    // await setRole('john.doe@gmail.com', 'admin');
+    // await setRole('jane.smith@company.com', 'manager');
+    // await setRole('staff.member@gmail.com', 'user');
     
     console.log('\n✅ 모든 설정이 완료되었습니다!');
     console.log('\n📋 다음 단계:');

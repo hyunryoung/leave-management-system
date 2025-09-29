@@ -1971,102 +1971,26 @@ function showFirebaseLoginModal() {
     loginModal.innerHTML = `
         <div class="modal-content" style="max-width: 450px; text-align: center;">
             <h3>🔐 휴가 관리 시스템 로그인</h3>
-            <div style="margin: 20px 0;">
-                <p><strong>관리자가 발급한 계정으로 로그인하세요.</strong></p>
-                
-                <div class="firebase-login-form" style="text-align: left; margin: 20px 0;">
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">이메일:</label>
-                        <input type="email" id="firebaseEmail" placeholder="admin@company.com" 
-                               style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px;">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">비밀번호:</label>
-                        <input type="password" id="firebasePassword" placeholder="비밀번호" 
-                               style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px;">
-                    </div>
-                    <div id="firebaseLoginError" style="color: red; margin: 10px 0; display: none; font-size: 14px;"></div>
-                </div>
-                
-                <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin: 15px 0; text-align: left; font-size: 13px;">
-                    <strong>📋 테스트 계정:</strong><br>
-                    <strong>관리자:</strong> admin@company.com / admin123<br>
-                    <strong>매니저:</strong> manager@company.com / manager123<br>
-                    <strong>직원:</strong> staff@company.com / staff123
-                </div>
-            </div>
+            <p style="margin: 8px 0 20px;">Google 계정으로 로그인하세요.</p>
             <div class="modal-buttons">
-                <button onclick="attemptFirebaseLogin()" style="background: #667eea; color: white; padding: 12px 25px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: 600;">로그인</button>
-                <button onclick="attemptFirebaseGoogleLogin()" style="margin-left: 8px; padding: 12px 25px; background: #db4437; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: 600;">Google로 로그인</button>
+                <button onclick="attemptFirebaseGoogleLogin()"
+                        style="padding: 12px 25px; background: #db4437; color: #fff; border: none; border-radius: 5px; font-weight: 600; font-size: 16px; cursor: pointer;">
+                    Google로 로그인
+                </button>
             </div>
         </div>
     `;
     
     document.body.appendChild(loginModal);
     
-    // Enter 키로 로그인
-    document.getElementById('firebasePassword').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            attemptFirebaseLogin();
-        }
-    });
-    
-    // 포커스
+    // Google 로그인 버튼에 포커스
     setTimeout(() => {
-        document.getElementById('firebaseEmail').focus();
+        const googleBtn = loginModal.querySelector('button');
+        if (googleBtn) googleBtn.focus();
     }, 100);
 }
 
-// Firebase 로그인 시도
-async function attemptFirebaseLogin() {
-    const email = document.getElementById('firebaseEmail').value.trim();
-    const password = document.getElementById('firebasePassword').value.trim();
-    const errorDiv = document.getElementById('firebaseLoginError');
-    
-    if (!email || !password) {
-        errorDiv.textContent = '이메일과 비밀번호를 입력해주세요.';
-        errorDiv.style.display = 'block';
-        return;
-    }
-    
-    try {
-        // Firebase 이메일/비밀번호 로그인
-        const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
-        const user = userCredential.user;
-        
-        // Custom Claims에서 역할 가져오기
-        const idTokenResult = await user.getIdTokenResult(true);
-        const role = idTokenResult.claims.role || 'user';
-        
-        console.log(`로그인 성공: ${email}, 역할: ${role}`);
-        
-        // 로그인 모달 제거
-        document.getElementById('firebaseLoginModal').remove();
-        
-        // Firebase 인증 상태 변경으로 자동으로 앱 초기화됨
-        
-    } catch (error) {
-        console.log('Firebase 로그인 실패:', error);
-        
-        let errorMessage = '로그인에 실패했습니다.';
-        if (error.code === 'auth/user-not-found') {
-            errorMessage = '등록되지 않은 이메일입니다.';
-        } else if (error.code === 'auth/wrong-password') {
-            errorMessage = '비밀번호가 틀렸습니다.';
-        } else if (error.code === 'auth/invalid-email') {
-            errorMessage = '이메일 형식이 올바르지 않습니다.';
-        } else if (error.code === 'auth/too-many-requests') {
-            errorMessage = '너무 많은 시도로 일시적으로 차단되었습니다.';
-        }
-        
-        errorDiv.textContent = errorMessage;
-        errorDiv.style.display = 'block';
-        
-        // 비밀번호 필드 초기화
-        document.getElementById('firebasePassword').value = '';
-        document.getElementById('firebasePassword').focus();
-    }
-}
+// 이메일/비밀번호 로그인 함수 제거됨 (Google 전용으로 전환)
 
 // Google 로그인 시도
 async function attemptFirebaseGoogleLogin() {
