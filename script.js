@@ -1229,12 +1229,17 @@ function initializeFirebase() {
                     // 로그인된 사용자의 Custom Claims에서 역할 가져오기
                     const idTokenResult = await user.getIdTokenResult(true);
                     const role = idTokenResult.claims.role || 'user';
-                    const email = user.email;
+                    const email = user.email || '';
+                    const displayName = user.displayName || '';
+                    const uid = user.uid;
+                    const safeName = email 
+                        ? email.split('@')[0] 
+                        : (displayName || (uid ? uid.slice(0, 6) : 'user'));
                     
                     // 세션에 사용자 정보 저장
                     sessionStorage.setItem('userRole', role);
-                    sessionStorage.setItem('userName', email.split('@')[0]);
-                    sessionStorage.setItem('userEmail', email);
+                    sessionStorage.setItem('userName', safeName);
+                    sessionStorage.setItem('userEmail', email || uid || '');
                     
                     isFirebaseEnabled = true;
                     console.log(`Firebase 인증 성공 - 이메일: ${email}, 역할: ${role}`);
@@ -1936,17 +1941,21 @@ async function logout() {
         deleteCookie('accessToken');
         await deleteFromIndexedDB('accessToken');
         
-        // Firebase 인증 로그아웃
-        if (isFirebaseEnabled && firebase.auth().currentUser) {
-            await firebase.auth().signOut();
+        // Firebase 인증 로그아웃: 현재 사용자 유무와 관계없이 한번 시도
+        try { 
+            await firebase.auth().signOut(); 
             console.log('Firebase 로그아웃 완료');
+        } catch (e) {
+            console.log('Firebase 로그아웃 시도:', e.message);
         }
         
         if (syncInterval) {
             clearInterval(syncInterval);
         }
         userToken = null;
-        location.reload();
+        
+        // 리로드 대신 초기 진입 페이지로 강제 이동(캐시된 상태 방지)
+        location.href = 'index.html';
     }
 }
 
