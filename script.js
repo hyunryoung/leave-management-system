@@ -3499,8 +3499,8 @@ function exportOvertimeToExcel() {
         return;
     }
 
-    // CSV 형식으로 데이터 생성
-    let csvContent = '날짜,직원명,시작시간,종료시간,야근시간,사유\n';
+    // CSV 형식으로 데이터 생성 (BOM 추가로 Excel 호환성 개선)
+    let csvContent = '\uFEFF날짜,직원명,시작시간,종료시간,야근시간,사유\n';
 
     monthRecords.forEach(record => {
         const row = [
@@ -3515,7 +3515,7 @@ function exportOvertimeToExcel() {
         csvContent += row + '\n';
     });
 
-    // 다운로드
+    // 다운로드 (BOM 포함으로 Excel에서 한글 정상 표시)
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
