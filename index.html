@@ -23,29 +23,120 @@
             </div>
         </header>
 
-        <div class="main-content">
-            <!-- 직원 관리 섹션 -->
-            <section class="employee-section">
-                <h2>직원 관리</h2>
-                <div class="add-employee">
-                    <input type="text" id="employeeName" placeholder="직원 이름">
-                    <input type="date" id="joinDate" placeholder="입사일">
-                    <button onclick="addEmployee()">직원 추가</button>
-                </div>
-                <div class="employee-summary" id="employeeSummary"></div>
-            </section>
+        <!-- 탭 네비게이션 -->
+        <div class="tab-navigation">
+            <button class="tab-button active" onclick="showTab('dashboard')">대시보드</button>
+            <button class="tab-button" onclick="showTab('hr')">HR 관리</button>
+        </div>
 
-            <!-- 달력 섹션 -->
-            <section class="calendar-section">
-                <h2>휴가 달력 (날짜 클릭으로 휴가 등록)</h2>
-                <div class="calendar-controls">
-                    <button onclick="previousMonth()">◀</button>
-                    <span id="currentMonth"></span>
-                    <button onclick="nextMonth()">▶</button>
-                </div>
-                <div class="selected-info" id="selectedInfo">드래그하여 연속 날짜 선택 또는 클릭하여 단일 날짜 선택</div>
-                <div class="calendar" id="calendar"></div>
-            </section>
+        <div class="main-content">
+            <!-- 대시보드 탭 -->
+            <div id="dashboardTab" class="tab-content active">
+                <!-- 직원 관리 섹션 -->
+                <section class="employee-section">
+                    <h2>직원 관리</h2>
+                    <div class="add-employee">
+                        <input type="text" id="employeeName" placeholder="직원 이름">
+                        <input type="date" id="joinDate" placeholder="입사일">
+                        <button onclick="addEmployee()">직원 추가</button>
+                    </div>
+                    <div class="employee-summary" id="employeeSummary"></div>
+                </section>
+
+                <!-- 달력 섹션 -->
+                <section class="calendar-section">
+                    <h2>휴가 달력 (날짜 클릭으로 휴가 등록)</h2>
+                    <div class="calendar-controls">
+                        <button onclick="previousMonth()">◀</button>
+                        <span id="currentMonth"></span>
+                        <button onclick="nextMonth()">▶</button>
+                    </div>
+                    <div class="selected-info" id="selectedInfo">드래그하여 연속 날짜 선택 또는 클릭하여 단일 날짜 선택</div>
+                    <div class="calendar" id="calendar"></div>
+                </section>
+            </div>
+
+            <!-- HR 관리 탭 -->
+            <div id="hrTab" class="tab-content">
+                <section class="hr-section">
+                    <h2>👥 HR 관리 (인사정보)</h2>
+                    
+                    <!-- HR 직원 추가/수정 폼 -->
+                    <div class="hr-form-section">
+                        <h3>직원 정보 등록/수정</h3>
+                        <div class="hr-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>직원 선택:</label>
+                                    <select id="hrEmployeeSelect" onchange="loadEmployeeHRData()">
+                                        <option value="">새 직원 등록</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>이름:</label>
+                                    <input type="text" id="hrEmployeeName" placeholder="직원 이름">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>입사일:</label>
+                                    <input type="date" id="hrJoinDate">
+                                </div>
+                                <div class="form-group">
+                                    <label>퇴사일:</label>
+                                    <input type="date" id="hrLeaveDate" placeholder="재직 중이면 비워두세요">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>휴대폰번호:</label>
+                                    <input type="tel" id="hrPhone" placeholder="010-1234-5678">
+                                </div>
+                                <div class="form-group">
+                                    <label>주민번호:</label>
+                                    <input type="text" id="hrSsn" placeholder="123456-1234567" maxlength="14">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>부서:</label>
+                                    <input type="text" id="hrDepartment" placeholder="부서명">
+                                </div>
+                                <div class="form-group">
+                                    <label>직급:</label>
+                                    <input type="text" id="hrPosition" placeholder="직급/직책">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group full-width">
+                                    <label>주소:</label>
+                                    <input type="text" id="hrAddress" placeholder="주소">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group full-width">
+                                    <label>비고:</label>
+                                    <textarea id="hrNotes" placeholder="특이사항, 메모 등" rows="3"></textarea>
+                                </div>
+                            </div>
+                            <div class="hr-buttons">
+                                <button onclick="saveEmployeeHRData()">저장</button>
+                                <button onclick="clearHRForm()">초기화</button>
+                                <button onclick="deleteEmployeeHRData()" class="delete-btn">삭제</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- HR 직원 목록 -->
+                    <div class="hr-list-section">
+                        <h3>직원 목록</h3>
+                        <div class="hr-search">
+                            <input type="text" id="hrSearchInput" placeholder="이름, 부서, 직급으로 검색..." onkeyup="filterHRList()">
+                        </div>
+                        <div class="hr-employee-list" id="hrEmployeeList"></div>
+                    </div>
+                </section>
+            </div>
         </div>
 
         <!-- 휴가 등록 모달 -->

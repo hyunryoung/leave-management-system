@@ -1905,3 +1905,356 @@ async function logout() {
         location.reload();
     }
 }
+
+// ===== HR 관리 기능 =====
+
+// 탭 전환 함수
+function showTab(tabName) {
+    // 모든 탭 버튼 비활성화
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // 모든 탭 컨텐츠 숨기기
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    
+    // 선택된 탭 활성화
+    event.target.classList.add('active');
+    
+    if (tabName === 'dashboard') {
+        document.getElementById('dashboardTab').classList.add('active');
+        // 대시보드 탭으로 전환 시 달력 다시 렌더링
+        renderCalendar();
+    } else if (tabName === 'hr') {
+        document.getElementById('hrTab').classList.add('active');
+        // HR 탭으로 전환 시 HR 데이터 로드
+        updateHREmployeeDropdown();
+        renderHREmployeeList();
+    }
+}
+
+// HR 직원 드롭다운 업데이트
+function updateHREmployeeDropdown() {
+    const dropdown = document.getElementById('hrEmployeeSelect');
+    dropdown.innerHTML = '<option value="">새 직원 등록</option>';
+    
+    employees.forEach(employee => {
+        const option = document.createElement('option');
+        option.value = employee.id;
+        option.textContent = employee.name;
+        dropdown.appendChild(option);
+    });
+}
+
+// 직원 HR 데이터 로드
+function loadEmployeeHRData() {
+    const employeeId = parseInt(document.getElementById('hrEmployeeSelect').value);
+    
+    if (!employeeId) {
+        clearHRForm();
+        return;
+    }
+    
+    const employee = employees.find(emp => emp.id === employeeId);
+    if (!employee) return;
+    
+    // HR 폼에 데이터 채우기
+    document.getElementById('hrEmployeeName').value = employee.name || '';
+    document.getElementById('hrJoinDate').value = employee.joinDate || '';
+    document.getElementById('hrLeaveDate').value = employee.hrData?.leaveDate || '';
+    document.getElementById('hrPhone').value = employee.hrData?.phone || '';
+    document.getElementById('hrSsn').value = employee.hrData?.ssn || '';
+    document.getElementById('hrDepartment').value = employee.hrData?.department || '';
+    document.getElementById('hrPosition').value = employee.hrData?.position || '';
+    document.getElementById('hrAddress').value = employee.hrData?.address || '';
+    document.getElementById('hrNotes').value = employee.hrData?.notes || '';
+}
+
+// HR 폼 초기화
+function clearHRForm() {
+    document.getElementById('hrEmployeeSelect').value = '';
+    document.getElementById('hrEmployeeName').value = '';
+    document.getElementById('hrJoinDate').value = '';
+    document.getElementById('hrLeaveDate').value = '';
+    document.getElementById('hrPhone').value = '';
+    document.getElementById('hrSsn').value = '';
+    document.getElementById('hrDepartment').value = '';
+    document.getElementById('hrPosition').value = '';
+    document.getElementById('hrAddress').value = '';
+    document.getElementById('hrNotes').value = '';
+}
+
+// 직원 HR 데이터 저장
+async function saveEmployeeHRData() {
+    // 권한 체크: 매니저 이상만 가능
+    if (!checkPermission('manager')) {
+        showNoPermissionAlert('HR 정보 관리');
+        return;
+    }
+    
+    const employeeId = parseInt(document.getElementById('hrEmployeeSelect').value);
+    const name = document.getElementById('hrEmployeeName').value.trim();
+    const joinDate = document.getElementById('hrJoinDate').value;
+    const leaveDate = document.getElementById('hrLeaveDate').value;
+    const phone = document.getElementById('hrPhone').value.trim();
+    const ssn = document.getElementById('hrSsn').value.trim();
+    const department = document.getElementById('hrDepartment').value.trim();
+    const position = document.getElementById('hrPosition').value.trim();
+    const address = document.getElementById('hrAddress').value.trim();
+    const notes = document.getElementById('hrNotes').value.trim();
+    
+    if (!name || !joinDate) {
+        alert('이름과 입사일은 필수 항목입니다.');
+        return;
+    }
+    
+    // 전화번호 형식 검증
+    if (phone && !/^010-\d{4}-\d{4}$/.test(phone)) {
+        alert('휴대폰번호는 010-1234-5678 형식으로 입력해주세요.');
+        return;
+    }
+    
+    // 주민번호 형식 검증
+    if (ssn && !/^\d{6}-\d{7}$/.test(ssn)) {
+        alert('주민번호는 123456-1234567 형식으로 입력해주세요.');
+        return;
+    }
+    
+    let employee;
+    
+    if (employeeId) {
+        // 기존 직원 수정
+        employee = employees.find(emp => emp.id === employeeId);
+        if (!employee) {
+            alert('직원을 찾을 수 없습니다.');
+            return;
+        }
+        
+        // 기본 정보 업데이트
+        employee.name = name;
+        employee.joinDate = joinDate;
+        
+    } else {
+        // 새 직원 추가
+        employee = {
+            id: Date.now(),
+            name: name,
+            joinDate: joinDate,
+            annualLeave: 0,
+            monthlyLeave: 0,
+            usedAnnual: 0,
+            usedMonthly: 0,
+            lastMonthlyUpdate: joinDate
+        };
+        
+        // 초기 연차/월차 계산
+        calculateEmployeeLeaves(employee);
+        employees.push(employee);
+    }
+    
+    // HR 데이터 저장
+    employee.hrData = {
+        leaveDate: leaveDate,
+        phone: phone,
+        ssn: ssn,
+        department: department,
+        position: position,
+        address: address,
+        notes: notes,
+        lastUpdated: new Date().toISOString()
+    };
+    
+    // 개별 저장
+    await saveEmployee(employee);
+    saveData();
+    
+    // UI 업데이트
+    renderEmployeeSummary();
+    updateModalEmployeeDropdown();
+    updateHREmployeeDropdown();
+    renderHREmployeeList();
+    
+    alert('직원 정보가 저장되었습니다.');
+}
+
+// 직원 HR 데이터 삭제
+async function deleteEmployeeHRData() {
+    // 권한 체크: 관리자만 가능
+    if (!checkPermission('admin')) {
+        showNoPermissionAlert('직원 삭제');
+        return;
+    }
+    
+    const employeeId = parseInt(document.getElementById('hrEmployeeSelect').value);
+    if (!employeeId) {
+        alert('삭제할 직원을 선택해주세요.');
+        return;
+    }
+    
+    const employee = employees.find(emp => emp.id === employeeId);
+    if (!employee) {
+        alert('직원을 찾을 수 없습니다.');
+        return;
+    }
+    
+    if (confirm(`정말로 ${employee.name} 직원을 삭제하시겠습니까?\n\n⚠️ 주의: 해당 직원의 모든 휴가 기록도 함께 삭제됩니다.`)) {
+        // 직원 삭제
+        employees = employees.filter(emp => emp.id !== employeeId);
+        
+        // 해당 직원의 휴가 기록도 삭제
+        leaveRecords = leaveRecords.filter(record => record.employeeId !== employeeId);
+        
+        // Firebase에서도 삭제
+        if (isFirebaseEnabled) {
+            try {
+                await database.ref(`employees/${employeeId}`).remove();
+                
+                // 해당 직원의 휴가 기록들도 Firebase에서 삭제
+                const recordsToDelete = leaveRecords.filter(record => record.employeeId === employeeId);
+                for (const record of recordsToDelete) {
+                    const safeId = record.id.toString().replace(/\./g, '_');
+                    await database.ref(`leaveRecords/${safeId}`).remove();
+                }
+            } catch (error) {
+                console.log('Firebase 삭제 실패:', error);
+            }
+        }
+        
+        saveData();
+        
+        // UI 업데이트
+        clearHRForm();
+        renderEmployeeSummary();
+        updateModalEmployeeDropdown();
+        updateHREmployeeDropdown();
+        renderHREmployeeList();
+        renderCalendar();
+        
+        alert('직원이 삭제되었습니다.');
+    }
+}
+
+// HR 직원 목록 렌더링
+function renderHREmployeeList() {
+    const container = document.getElementById('hrEmployeeList');
+    container.innerHTML = '';
+    
+    if (employees.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: 40px; color: #6c757d;">등록된 직원이 없습니다.</div>';
+        return;
+    }
+    
+    employees.forEach(employee => {
+        const card = document.createElement('div');
+        card.className = 'hr-employee-card';
+        
+        const joinDate = new Date(employee.joinDate);
+        const today = new Date();
+        const daysDiff = Math.floor((today - joinDate) / (1000 * 60 * 60 * 24));
+        const years = Math.floor(daysDiff / 365);
+        const months = Math.floor((daysDiff % 365) / 30);
+        
+        const hrData = employee.hrData || {};
+        const isActive = !hrData.leaveDate || new Date(hrData.leaveDate) > today;
+        
+        card.innerHTML = `
+            <div class="hr-employee-name">
+                ${employee.name} 
+                <span style="font-size: 0.8rem; color: ${isActive ? '#28a745' : '#dc3545'};">
+                    ${isActive ? '재직중' : '퇴사'}
+                </span>
+            </div>
+            <div class="hr-employee-info">
+                <div class="hr-info-item">
+                    <span class="hr-info-label">부서:</span>
+                    <span>${hrData.department || '미설정'}</span>
+                </div>
+                <div class="hr-info-item">
+                    <span class="hr-info-label">직급:</span>
+                    <span>${hrData.position || '미설정'}</span>
+                </div>
+                <div class="hr-info-item">
+                    <span class="hr-info-label">입사일:</span>
+                    <span>${employee.joinDate} (${years}년 ${months}개월)</span>
+                </div>
+                <div class="hr-info-item">
+                    <span class="hr-info-label">연락처:</span>
+                    <span>${hrData.phone || '미등록'}</span>
+                </div>
+                ${hrData.leaveDate ? `
+                <div class="hr-info-item">
+                    <span class="hr-info-label">퇴사일:</span>
+                    <span>${hrData.leaveDate}</span>
+                </div>
+                ` : ''}
+                ${hrData.lastUpdated ? `
+                <div class="hr-info-item">
+                    <span class="hr-info-label">최종수정:</span>
+                    <span>${new Date(hrData.lastUpdated).toLocaleDateString('ko-KR')}</span>
+                </div>
+                ` : ''}
+            </div>
+        `;
+        
+        // 카드 클릭 시 해당 직원 정보 로드
+        card.addEventListener('click', () => {
+            document.getElementById('hrEmployeeSelect').value = employee.id;
+            loadEmployeeHRData();
+            
+            // 폼 영역으로 스크롤
+            document.querySelector('.hr-form-section').scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start' 
+            });
+        });
+        
+        container.appendChild(card);
+    });
+}
+
+// HR 직원 목록 필터링
+function filterHRList() {
+    const searchTerm = document.getElementById('hrSearchInput').value.toLowerCase();
+    const cards = document.querySelectorAll('.hr-employee-card');
+    
+    cards.forEach(card => {
+        const text = card.textContent.toLowerCase();
+        if (text.includes(searchTerm)) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+// 주민번호 입력 시 자동 하이픈 추가
+document.addEventListener('DOMContentLoaded', function() {
+    const ssnInput = document.getElementById('hrSsn');
+    if (ssnInput) {
+        ssnInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/[^0-9]/g, '');
+            if (value.length >= 6) {
+                value = value.substring(0, 6) + '-' + value.substring(6, 13);
+            }
+            e.target.value = value;
+        });
+    }
+    
+    // 휴대폰번호 입력 시 자동 하이픈 추가
+    const phoneInput = document.getElementById('hrPhone');
+    if (phoneInput) {
+        phoneInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/[^0-9]/g, '');
+            if (value.length >= 3) {
+                if (value.length <= 7) {
+                    value = value.substring(0, 3) + '-' + value.substring(3);
+                } else {
+                    value = value.substring(0, 3) + '-' + value.substring(3, 7) + '-' + value.substring(7, 11);
+                }
+            }
+            e.target.value = value;
+        });
+    }
+});
