@@ -566,7 +566,7 @@ function updateModalEmployeeDropdown() {
 }
 
 // 야근 탭 드롭다운 업데이트
-function updateOvertimeDropdowns() {
+function updateOvertimeEmployeeDropdown() {
     const employeeSelect = document.getElementById('overtimeEmployee');
     const filterDropdown = document.getElementById('overtimeFilterEmployee');
     if (employeeSelect) {
@@ -1004,13 +1004,15 @@ async function loadData() {
     // Firebase에서 보안 인증된 상태로 로드 시도
     if (isFirebaseEnabled && firebase.auth().currentUser) {
         try {
-            const [employeesSnapshot, recordsSnapshot] = await Promise.all([
+            const [employeesSnapshot, recordsSnapshot, overtimeSnapshot] = await Promise.all([
                 database.ref('employees').once('value'),
-                database.ref('leaveRecords').once('value')
+                database.ref('leaveRecords').once('value'),
+                database.ref('overtimeRecords').once('value')
             ]);
-            
+
             const firebaseEmployees = employeesSnapshot.val();
             const firebaseRecords = recordsSnapshot.val();
+            const firebaseOvertimeRecords = overtimeSnapshot.val();
             
             if (firebaseEmployees) {
                 let newEmployees = Array.isArray(firebaseEmployees) ? firebaseEmployees : Object.values(firebaseEmployees);
@@ -1033,14 +1035,21 @@ async function loadData() {
             }
             
             if (firebaseRecords) {
-                leaveRecords = Array.isArray(firebaseRecords) ? firebaseRecords : 
+                leaveRecords = Array.isArray(firebaseRecords) ? firebaseRecords :
                     Object.values(firebaseRecords).filter(record => record && record.id && !record.id.toString().includes('.'));
                 console.log('Firebase에서 보안 인증된 상태로 휴가 데이터 로드:', leaveRecords.length + '개');
+            }
+
+            if (firebaseOvertimeRecords) {
+                overtimeRecords = Array.isArray(firebaseOvertimeRecords) ? firebaseOvertimeRecords :
+                    Object.values(firebaseOvertimeRecords).filter(record => record && record.id);
+                console.log('Firebase에서 보안 인증된 상태로 야근 데이터 로드:', overtimeRecords.length + '개');
             }
             
             // Firebase 데이터를 로컬에도 백업
             if (firebaseEmployees) localStorage.setItem('employees', JSON.stringify(employees));
             if (firebaseRecords) localStorage.setItem('leaveRecords', JSON.stringify(leaveRecords));
+            if (firebaseOvertimeRecords) localStorage.setItem('overtimeRecords', JSON.stringify(overtimeRecords));
             
             return;
             
@@ -1868,9 +1877,9 @@ function subscribeRealtimeData() {
         if (map) {
             try {
                 overtimeRecords = Array.isArray(map) ? map : Object.values(map);
-                // renderOvertimeCalendar(); // 초과근무 달력 기능 비활성화
-                // renderOvertimeList(); // 초과근무 목록 기능 비활성화
-                // renderOvertimeSummary(); // 초과근무 요약 기능 비활성화
+                renderOvertimeCalendar();
+                renderOvertimeList();
+                renderOvertimeSummary();
                 console.log('🔥 야근 데이터 실시간 업데이트:', overtimeRecords.length + '개');
             } catch (e) {
                 console.log('야근 데이터 실시간 업데이트 실패:', e);
@@ -1940,10 +1949,10 @@ async function initializeApp() {
     setInterval(calculateLeaves, 60000);
 
     // 초기 야근 UI 렌더링 및 드롭다운 구성
-    updateOvertimeDropdowns();
-    // renderOvertimeCalendar(); // 초과근무 달력 기능 비활성화
-    // renderOvertimeList(); // 초과근무 목록 기능 비활성화
-    // renderOvertimeSummary(); // 초과근무 요약 기능 비활성화
+    updateOvertimeEmployeeDropdown();
+    renderOvertimeCalendar();
+    renderOvertimeList();
+    renderOvertimeSummary();
     
     // 전역 마우스 이벤트
     document.addEventListener('mouseup', () => {
@@ -2666,10 +2675,10 @@ function showTab(tabName) {
             overtimeTab.classList.add('active');
         }
         // 야근 탭 전환 시 렌더링 및 드롭다운 갱신
-        updateOvertimeDropdowns();
-        // renderOvertimeCalendar(); // 초과근무 달력 기능 비활성화
-        // renderOvertimeList(); // 초과근무 목록 기능 비활성화
-        // renderOvertimeSummary(); // 초과근무 요약 기능 비활성화
+        updateOvertimeEmployeeDropdown();
+        renderOvertimeCalendar();
+        renderOvertimeList();
+        renderOvertimeSummary();
     } else if (tabName === 'hr') {
         document.getElementById('hrTab').classList.add('active');
         // HR 탭으로 전환 시 HR 데이터 로드
@@ -3025,45 +3034,495 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// ===== 초과근무 관련 스텁 함수들 (기능 비활성화) =====
-// 나중에 초과근무 기능 구현 시 활성화 필요
+// ===== 초과근무 관리 기능 =====
 
-// 초과근무 달력 렌더링 (스텁)
-function renderOvertimeCalendar() {
-    console.log('초과근무 달력 기능은 현재 비활성화 상태입니다.');
-}
-
-// 초과근무 목록 렌더링 (스텁)
-function renderOvertimeList() {
-    console.log('초과근무 목록 기능은 현재 비활성화 상태입니다.');
-}
-
-// 초과근무 요약 렌더링 (스텁)
-function renderOvertimeSummary() {
-    console.log('초과근무 요약 기능은 현재 비활성화 상태입니다.');
-}
-
-// 초과근무 기록 추가 (스텁)
-function addOvertimeRecord() {
-    alert('초과근무 기록 기능은 현재 비활성화 상태입니다.');
-}
-
-// 초과근무 직원 드롭다운 업데이트 (스텁)
+// 초과근무 직원 드롭다운 업데이트
 function updateOvertimeEmployeeDropdown() {
-    console.log('초과근무 직원 드롭다운 기능은 현재 비활성화 상태입니다.');
+    const dropdown = document.getElementById('overtimeEmployee');
+    const filterDropdown = document.getElementById('overtimeFilterEmployee');
+
+    if (dropdown) {
+        dropdown.innerHTML = '<option value="">직원 선택</option>';
+        employees.forEach(employee => {
+            const option = document.createElement('option');
+            option.value = employee.id;
+            option.textContent = employee.name;
+            dropdown.appendChild(option);
+        });
+    }
+
+    if (filterDropdown) {
+        filterDropdown.innerHTML = '<option value="">전체 직원</option>';
+        employees.forEach(employee => {
+            const option = document.createElement('option');
+            option.value = employee.id;
+            option.textContent = employee.name;
+            filterDropdown.appendChild(option);
+        });
+    }
 }
 
-// 이전 달로 이동 (초과근무)
+// 야근 기록 추가
+async function addOvertimeRecord() {
+    // 권한 체크: 매니저 이상만 가능
+    if (!checkPermission('manager')) {
+        showNoPermissionAlert('야근 기록 추가');
+        return;
+    }
+
+    const date = document.getElementById('overtimeDate').value;
+    const employeeId = parseInt(document.getElementById('overtimeEmployee').value);
+    const startTime = document.getElementById('overtimeStartTime').value;
+    const endTime = document.getElementById('overtimeEndTime').value;
+    const reason = document.getElementById('overtimeReason').value.trim();
+
+    if (!date || !employeeId || !startTime || !endTime) {
+        alert('필수 항목을 모두 입력해주세요.');
+        return;
+    }
+
+    const employee = employees.find(emp => emp.id === employeeId);
+    if (!employee) {
+        alert('직원을 찾을 수 없습니다.');
+        return;
+    }
+
+    // 야근 시간 계산
+    const start = new Date(`2000-01-01T${startTime}`);
+    const end = new Date(`2000-01-01T${endTime}`);
+
+    // 종료 시간이 시작 시간보다 이전인 경우 (자정 넘김)
+    if (end < start) {
+        end.setDate(end.getDate() + 1);
+    }
+
+    const hours = (end - start) / (1000 * 60 * 60);
+
+    if (hours <= 0) {
+        alert('종료 시간은 시작 시간보다 늦어야 합니다.');
+        return;
+    }
+
+    const overtimeRecord = {
+        id: Date.now(),
+        employeeId: employeeId,
+        employeeName: employee.name,
+        date: date,
+        startTime: startTime,
+        endTime: endTime,
+        hours: hours,
+        reason: reason,
+        createdAt: new Date().toISOString(),
+        createdBy: sessionStorage.getItem('userName') || '알 수 없음'
+    };
+
+    overtimeRecords.push(overtimeRecord);
+
+    // Firebase에 저장
+    await saveOvertimeRecord(overtimeRecord);
+    saveData();
+
+    // 폼 초기화
+    document.getElementById('overtimeDate').value = '';
+    document.getElementById('overtimeEmployee').value = '';
+    document.getElementById('overtimeStartTime').value = '18:00';
+    document.getElementById('overtimeEndTime').value = '21:00';
+    document.getElementById('overtimeReason').value = '';
+
+    // UI 업데이트
+    renderOvertimeCalendar();
+    renderOvertimeList();
+    renderOvertimeSummary();
+
+    alert('야근 기록이 추가되었습니다.');
+}
+
+// 야근 달력 렌더링
+function renderOvertimeCalendar() {
+    const calendar = document.getElementById('overtimeCalendar');
+    if (!calendar) return;
+
+    const monthYearStr = overtimeDisplayMonth.toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: 'long'
+    });
+
+    const currentMonthElement = document.getElementById('currentOvertimeMonth');
+    if (currentMonthElement) {
+        currentMonthElement.textContent = monthYearStr;
+    }
+
+    calendar.innerHTML = '';
+
+    // 요일 헤더
+    const daysOfWeek = ['일', '월', '화', '수', '목', '금', '토'];
+    daysOfWeek.forEach(day => {
+        const header = document.createElement('div');
+        header.className = 'calendar-header';
+        header.textContent = day;
+        calendar.appendChild(header);
+    });
+
+    // 달력 날짜
+    const year = overtimeDisplayMonth.getFullYear();
+    const month = overtimeDisplayMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startDate = firstDay.getDay();
+    const endDate = lastDay.getDate();
+
+    // 이전 달 날짜
+    for (let i = startDate - 1; i >= 0; i--) {
+        const day = document.createElement('div');
+        day.className = 'calendar-day other-month';
+        calendar.appendChild(day);
+    }
+
+    // 현재 달 날짜
+    for (let i = 1; i <= endDate; i++) {
+        const day = document.createElement('div');
+        day.className = 'calendar-day overtime-day';
+
+        const currentDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        if (currentDateStr === todayStr) {
+            day.classList.add('today');
+        }
+
+        // 해당 날짜의 야근 정보
+        const dayOvertimes = overtimeRecords.filter(record => record.date === currentDateStr);
+        let dayHTML = `<div class="day-number">${i}</div>`;
+
+        if (dayOvertimes.length > 0) {
+            const totalHours = dayOvertimes.reduce((sum, record) => sum + record.hours, 0);
+            dayHTML += `<div class="overtime-info">
+                <div class="overtime-count">${dayOvertimes.length}명</div>
+                <div class="overtime-hours">${totalHours.toFixed(1)}h</div>
+            </div>`;
+            day.classList.add('has-overtime');
+        }
+
+        day.innerHTML = dayHTML;
+        day.dataset.date = currentDateStr;
+
+        // 클릭 이벤트로 해당 날짜 야근 상세 보기
+        day.addEventListener('click', () => showOvertimeDetail(currentDateStr));
+
+        calendar.appendChild(day);
+    }
+
+    // 다음 달 날짜
+    const remainingDays = 42 - (startDate + endDate);
+    for (let i = 1; i <= remainingDays; i++) {
+        const day = document.createElement('div');
+        day.className = 'calendar-day other-month';
+        calendar.appendChild(day);
+    }
+
+    // 통계 업데이트
+    updateOvertimeStats();
+}
+
+// 야근 통계 업데이트
+function updateOvertimeStats() {
+    const year = overtimeDisplayMonth.getFullYear();
+    const month = overtimeDisplayMonth.getMonth();
+
+    const monthRecords = overtimeRecords.filter(record => {
+        const recordDate = new Date(record.date);
+        return recordDate.getFullYear() === year && recordDate.getMonth() === month;
+    });
+
+    const totalHours = monthRecords.reduce((sum, record) => sum + record.hours, 0);
+    const uniqueEmployees = new Set(monthRecords.map(record => record.employeeId)).size;
+
+    const totalHoursElement = document.getElementById('totalOvertimeHours');
+    const totalPeopleElement = document.getElementById('totalOvertimePeople');
+
+    if (totalHoursElement) {
+        totalHoursElement.textContent = `${totalHours.toFixed(1)}시간`;
+    }
+    if (totalPeopleElement) {
+        totalPeopleElement.textContent = `${uniqueEmployees}명`;
+    }
+}
+
+// 야근 목록 렌더링
+function renderOvertimeList() {
+    const container = document.getElementById('overtimeList');
+    if (!container) return;
+
+    const year = overtimeDisplayMonth.getFullYear();
+    const month = overtimeDisplayMonth.getMonth();
+
+    let filteredRecords = overtimeRecords.filter(record => {
+        const recordDate = new Date(record.date);
+        return recordDate.getFullYear() === year && recordDate.getMonth() === month;
+    });
+
+    // 직원 필터 적용
+    const filterEmployee = document.getElementById('overtimeFilterEmployee');
+    if (filterEmployee && filterEmployee.value) {
+        const employeeId = parseInt(filterEmployee.value);
+        filteredRecords = filteredRecords.filter(record => record.employeeId === employeeId);
+    }
+
+    // 날짜 역순 정렬
+    filteredRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    if (filteredRecords.length === 0) {
+        container.innerHTML = '<div class="no-records">이번 달 야근 기록이 없습니다.</div>';
+        return;
+    }
+
+    container.innerHTML = '';
+
+    filteredRecords.forEach(record => {
+        const item = document.createElement('div');
+        item.className = 'overtime-item';
+
+        const weekday = ['일', '월', '화', '수', '목', '금', '토'][new Date(record.date).getDay()];
+
+        item.innerHTML = `
+            <div class="overtime-item-header">
+                <div class="overtime-item-date">${record.date} (${weekday})</div>
+                <div class="overtime-item-employee">${record.employeeName}</div>
+            </div>
+            <div class="overtime-item-details">
+                <span class="overtime-time">${record.startTime} ~ ${record.endTime}</span>
+                <span class="overtime-duration">${record.hours.toFixed(1)}시간</span>
+            </div>
+            ${record.reason ? `<div class="overtime-reason">사유: ${record.reason}</div>` : ''}
+            <div class="overtime-item-actions">
+                ${checkPermission('manager') ? `
+                    <button onclick="editOvertimeRecord(${record.id})" class="btn-edit">수정</button>
+                    <button onclick="deleteOvertimeRecord(${record.id})" class="btn-delete">삭제</button>
+                ` : ''}
+            </div>
+        `;
+
+        container.appendChild(item);
+    });
+}
+
+// 직원별 야근 통계 렌더링
+function renderOvertimeSummary() {
+    const container = document.getElementById('overtimeSummary');
+    if (!container) return;
+
+    const year = overtimeDisplayMonth.getFullYear();
+    const month = overtimeDisplayMonth.getMonth();
+
+    const monthRecords = overtimeRecords.filter(record => {
+        const recordDate = new Date(record.date);
+        return recordDate.getFullYear() === year && recordDate.getMonth() === month;
+    });
+
+    // 직원별 통계 계산
+    const employeeStats = {};
+
+    monthRecords.forEach(record => {
+        if (!employeeStats[record.employeeId]) {
+            employeeStats[record.employeeId] = {
+                name: record.employeeName,
+                count: 0,
+                totalHours: 0,
+                dates: []
+            };
+        }
+
+        employeeStats[record.employeeId].count++;
+        employeeStats[record.employeeId].totalHours += record.hours;
+        employeeStats[record.employeeId].dates.push(record.date);
+    });
+
+    // 총 시간 기준 정렬
+    const sortedStats = Object.values(employeeStats).sort((a, b) => b.totalHours - a.totalHours);
+
+    if (sortedStats.length === 0) {
+        container.innerHTML = '<div class="no-records">이번 달 야근 기록이 없습니다.</div>';
+        return;
+    }
+
+    container.innerHTML = '';
+
+    sortedStats.forEach((stat, index) => {
+        const card = document.createElement('div');
+        card.className = 'overtime-summary-card';
+
+        // 순위에 따른 색상
+        let rankClass = '';
+        if (index === 0) rankClass = 'rank-gold';
+        else if (index === 1) rankClass = 'rank-silver';
+        else if (index === 2) rankClass = 'rank-bronze';
+
+        card.innerHTML = `
+            <div class="summary-rank ${rankClass}">${index + 1}위</div>
+            <div class="summary-employee">${stat.name}</div>
+            <div class="summary-stats">
+                <div class="stat-box">
+                    <div class="stat-value">${stat.totalHours.toFixed(1)}시간</div>
+                    <div class="stat-label">총 야근</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">${stat.count}일</div>
+                    <div class="stat-label">야근 일수</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">${(stat.totalHours / stat.count).toFixed(1)}시간</div>
+                    <div class="stat-label">일평균</div>
+                </div>
+            </div>
+        `;
+
+        container.appendChild(card);
+    });
+}
+
+// 이전 달로 이동
 function previousOvertimeMonth() {
-    console.log('초과근무 이전 달 기능은 현재 비활성화 상태입니다.');
+    overtimeDisplayMonth.setMonth(overtimeDisplayMonth.getMonth() - 1);
+    renderOvertimeCalendar();
+    renderOvertimeList();
+    renderOvertimeSummary();
 }
 
-// 다음 달로 이동 (초과근무)
+// 다음 달로 이동
 function nextOvertimeMonth() {
-    console.log('초과근무 다음 달 기능은 현재 비활성화 상태입니다.');
+    overtimeDisplayMonth.setMonth(overtimeDisplayMonth.getMonth() + 1);
+    renderOvertimeCalendar();
+    renderOvertimeList();
+    renderOvertimeSummary();
 }
 
-// 초과근무 필터링 (스텁)
+// 야근 기록 필터링
 function filterOvertimeRecords() {
-    console.log('초과근무 필터 기능은 현재 비활성화 상태입니다.');
+    renderOvertimeList();
+}
+
+// 야근 상세 보기
+function showOvertimeDetail(date) {
+    const dayRecords = overtimeRecords.filter(record => record.date === date);
+
+    if (dayRecords.length === 0) return;
+
+    let detailHTML = `<h3>${date} 야근 현황</h3>`;
+    dayRecords.forEach(record => {
+        detailHTML += `
+            <div class="overtime-detail-item">
+                <strong>${record.employeeName}</strong>:
+                ${record.startTime} ~ ${record.endTime} (${record.hours.toFixed(1)}시간)
+                ${record.reason ? `<br>사유: ${record.reason}` : ''}
+            </div>
+        `;
+    });
+
+    alert(detailHTML.replace(/<[^>]*>/g, '\n').replace(/\n+/g, '\n'));
+}
+
+// 야근 기록 삭제
+async function deleteOvertimeRecord(id) {
+    if (!checkPermission('manager')) {
+        showNoPermissionAlert('야근 기록 삭제');
+        return;
+    }
+
+    if (!confirm('이 야근 기록을 삭제하시겠습니까?')) return;
+
+    overtimeRecords = overtimeRecords.filter(record => record.id !== id);
+
+    // Firebase에서 삭제
+    if (isFirebaseEnabled) {
+        await database.ref(`overtimeRecords/${id}`).remove();
+    }
+
+    saveData();
+    renderOvertimeCalendar();
+    renderOvertimeList();
+    renderOvertimeSummary();
+
+    alert('야근 기록이 삭제되었습니다.');
+}
+
+// 야근 기록 수정
+function editOvertimeRecord(id) {
+    if (!checkPermission('manager')) {
+        showNoPermissionAlert('야근 기록 수정');
+        return;
+    }
+
+    const record = overtimeRecords.find(r => r.id === id);
+    if (!record) return;
+
+    // 폼에 기존 데이터 채우기
+    document.getElementById('overtimeDate').value = record.date;
+    document.getElementById('overtimeEmployee').value = record.employeeId;
+    document.getElementById('overtimeStartTime').value = record.startTime;
+    document.getElementById('overtimeEndTime').value = record.endTime;
+    document.getElementById('overtimeReason').value = record.reason || '';
+
+    // 기존 기록 삭제
+    overtimeRecords = overtimeRecords.filter(r => r.id !== id);
+
+    // 스크롤을 폼으로 이동
+    const formSection = document.querySelector('.overtime-form-section');
+    if (formSection) {
+        formSection.scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+// 야근 기록 Firebase 저장
+async function saveOvertimeRecord(record) {
+    if (isFirebaseEnabled) {
+        try {
+            await database.ref(`overtimeRecords/${record.id}`).set(record);
+            console.log('Firebase에 야근 기록 저장 완료');
+        } catch (error) {
+            console.log('Firebase 야근 저장 실패:', error);
+        }
+    }
+}
+
+// 엑셀 내보내기
+function exportOvertimeToExcel() {
+    const year = overtimeDisplayMonth.getFullYear();
+    const month = overtimeDisplayMonth.getMonth() + 1;
+
+    const monthRecords = overtimeRecords.filter(record => {
+        const recordDate = new Date(record.date);
+        return recordDate.getFullYear() === year && recordDate.getMonth() === month - 1;
+    });
+
+    if (monthRecords.length === 0) {
+        alert('내보낼 야근 기록이 없습니다.');
+        return;
+    }
+
+    // CSV 형식으로 데이터 생성
+    let csvContent = '날짜,직원명,시작시간,종료시간,야근시간,사유\n';
+
+    monthRecords.forEach(record => {
+        const row = [
+            record.date,
+            record.employeeName,
+            record.startTime,
+            record.endTime,
+            record.hours.toFixed(1) + '시간',
+            record.reason || ''
+        ].map(field => `"${field}"`).join(',');
+
+        csvContent += row + '\n';
+    });
+
+    // 다운로드
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `야근기록_${year}년${month}월.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }

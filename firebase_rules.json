@@ -1,0 +1,20 @@
+{
+  "rules": {
+    "employees": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "leaveRecords": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "tokens": {
+      ".read": "auth != null && (auth.token.email == 'shr941207@gmail.com' || root.child('users').child(auth.uid).child('role').val() == 'admin')",
+      ".write": "auth != null && (auth.token.email == 'shr941207@gmail.com' || root.child('users').child(auth.uid).child('role').val() == 'admin')"
+    },
+    "overtimeRecords": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}
