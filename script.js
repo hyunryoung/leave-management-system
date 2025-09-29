@@ -2126,11 +2126,9 @@ function decryptSensitiveData(encryptedData, masterKey = null) {
 
 // 마스터 키 생성 (실제 운영시에는 Firebase Secret Manager 사용)
 function generateMasterKey() {
-    // 실제 운영시에는 환경변수나 Firebase Secret Manager에서 가져와야 함
-    const baseKey = 'HRMS_PRODUCTION_KEY_2025';
-    const userAgent = navigator.userAgent.substring(0, 20);
-    const timestamp = Math.floor(Date.now() / (1000 * 60 * 60 * 24)); // 일별 변경
-    return btoa(baseKey + userAgent + timestamp).substring(0, 32);
+    // ⚠️ 운영에선 Secret Manager/환경변수에서 읽어오세요.
+    const baseKey = 'HRMS_PRODUCTION_KEY_2025_STATIC';
+    return btoa(baseKey).substring(0, 32);
 }
 
 // 랜덤 솔트 생성
@@ -2171,6 +2169,75 @@ function maskSensitiveData(data, type) {
         default:
             return data;
     }
+}
+
+// ===== HR 데이터 마이그레이션 =====
+
+// 관리자 전용. 로그인 후 콘솔에서 한 번 호출.
+async function migrateHRDataKeys(daysBack = 30) {
+    const EMP_PHONE = /^010-\d{4}-\d{4}$/;
+    const tryDates = [...Array(daysBack).keys()].map(d => {
+        const dt = new Date(); 
+        dt.setDate(dt.getDate() - d);
+        // 기존 generateMasterKey()가 '일 단위'를 썼으므로 그날의 키를 재현
+        const baseKey = 'HRMS_PRODUCTION_KEY_2025';
+        const userAgent = navigator.userAgent.substring(0, 20);
+        const timestamp = Math.floor(dt.getTime() / (1000 * 60 * 60 * 24));
+        return btoa(baseKey + userAgent + timestamp).substring(0, 32);
+    });
+
+    const snapshot = await database.ref('employees').once('value');
+    const employeesMap = snapshot.val() || {};
+    const employeesList = Array.isArray(employeesMap) ? employeesMap : Object.values(employeesMap);
+
+    let fixed = 0;
+    for (const emp of employeesList) {
+        if (!emp?.hrData?.encrypted) continue;
+        const hr = emp.hrData;
+
+        // 대상 필드들만 시도
+        for (const k of ['phone','ssn','address']) {
+            if (!hr[k]) continue;
+
+            let plain = null;
+
+            // 1) 현재(새 고정키)로 먼저 시도
+            try { 
+                plain = decryptSensitiveData(hr[k]); 
+                // 간단 검증
+                if (k === 'phone' && plain && !EMP_PHONE.test(plain)) plain = null;
+            } catch {}
+            
+            // 2) 안 되면 과거 날짜키들로 시도
+            if (!plain || /[^\x20-\x7E]/.test(plain)) {
+                for (const key of tryDates) {
+                    try {
+                        plain = decryptSensitiveData(hr[k], key);
+                        // 간단 검증: phone은 010-형식, ssn/addr은 글자 수로 대충 판단
+                        if (k === 'phone' && !EMP_PHONE.test(plain)) { 
+                            plain = null; 
+                            continue; 
+                        }
+                        if (plain && plain.length > 0) break;
+                    } catch { 
+                        plain = null; 
+                    }
+                }
+            }
+
+            if (plain) {
+                // 새 고정 키로 재암호화
+                hr[k] = encryptSensitiveData(plain);
+                console.log(`${emp.name} ${k} 마이그레이션 완료`);
+            }
+        }
+
+        await database.ref(`employees/${emp.id}`).set(emp);
+        fixed++;
+    }
+    
+    console.log(`🔄 HR 데이터 키 마이그레이션 완료: ${fixed}명`);
+    alert(`HR 데이터 키 마이그레이션이 완료되었습니다. (${fixed}명 처리)`);
 }
 
 // ===== HR 관리 기능 =====
