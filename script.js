@@ -1,8 +1,10 @@
 // 전역 변수
 let employees = [];
 let leaveRecords = [];
+let overtimeRecords = [];
 let currentDate = new Date();
 let displayMonth = new Date();
+let overtimeDisplayMonth = new Date();
 
 // 달력 선택 관련 변수
 let selectedDates = [];
@@ -563,6 +565,30 @@ function updateModalEmployeeDropdown() {
     });
 }
 
+// 야근 탭 드롭다운 업데이트
+function updateOvertimeDropdowns() {
+    const employeeSelect = document.getElementById('overtimeEmployee');
+    const filterDropdown = document.getElementById('overtimeFilterEmployee');
+    if (employeeSelect) {
+        employeeSelect.innerHTML = '<option value="">직원 선택</option>';
+        employees.forEach(employee => {
+            const option = document.createElement('option');
+            option.value = employee.id;
+            option.textContent = employee.name;
+            employeeSelect.appendChild(option);
+        });
+    }
+    if (filterDropdown) {
+        filterDropdown.innerHTML = '<option value="">전체 직원</option>';
+        employees.forEach(employee => {
+            const option = document.createElement('option');
+            option.value = employee.id;
+            option.textContent = employee.name;
+            filterDropdown.appendChild(option);
+        });
+    }
+}
+
 // 달력 날짜 선택 이벤트
 function handleDateMouseDown(e) {
     e.preventDefault();
@@ -943,6 +969,7 @@ async function saveData() {
     localStorage.setItem('employees', JSON.stringify(sanitizedEmployees));
     localStorage.setItem('leaveRecords', JSON.stringify(leaveRecords));
     localStorage.setItem('lastUpdate', Date.now().toString());
+    localStorage.setItem('overtimeRecords', JSON.stringify(overtimeRecords));
     
     // Firebase에 보안 인증된 상태로 저장
     if (isFirebaseEnabled && firebase.auth().currentUser) {
@@ -955,6 +982,11 @@ async function saveData() {
             // 휴가 기록들 개별 저장
             for (const record of leaveRecords) {
                 await saveLeaveRecord(record);
+            }
+
+            // 야근 기록들 개별 저장
+            for (const o of overtimeRecords) {
+                await saveOvertimeRecord(o);
             }
             
             await database.ref('lastUpdate').set(Date.now());
@@ -1020,6 +1052,7 @@ async function loadData() {
     // Firebase 실패 시 또는 인증 대기 중일 때 로컬 데이터 사용
     const savedEmployees = localStorage.getItem('employees');
     const savedRecords = localStorage.getItem('leaveRecords');
+    const savedOvertime = localStorage.getItem('overtimeRecords');
     
     if (savedEmployees) {
         employees = JSON.parse(savedEmployees);
@@ -1030,6 +1063,11 @@ async function loadData() {
     if (savedRecords) {
         leaveRecords = JSON.parse(savedRecords);
         console.log('로컬에서 휴가 데이터 로드 완료:', leaveRecords.length + '개');
+    }
+
+    if (savedOvertime) {
+        overtimeRecords = JSON.parse(savedOvertime);
+        console.log('로컬에서 야근 데이터 로드 완료:', overtimeRecords.length + '개');
     }
 }
 
@@ -1662,6 +1700,22 @@ function subscribeRealtimeData() {
             }
         }
     });
+
+    // 야근 데이터 실시간 반영
+    database.ref('overtimeRecords').on('value', (snap) => {
+        const map = snap.val();
+        if (map) {
+            try {
+                overtimeRecords = Array.isArray(map) ? map : Object.values(map);
+                renderOvertimeCalendar();
+                renderOvertimeList();
+                renderOvertimeSummary();
+                console.log('🔥 야근 데이터 실시간 업데이트:', overtimeRecords.length + '개');
+            } catch (e) {
+                console.log('야근 데이터 실시간 업데이트 실패:', e);
+            }
+        }
+    });
 }
 
 // Firebase 데이터 완전 정리
@@ -1723,6 +1777,12 @@ async function initializeApp() {
     
     // 매일 자정에 연차/월차 자동 계산
     setInterval(calculateLeaves, 60000);
+
+    // 초기 야근 UI 렌더링 및 드롭다운 구성
+    updateOvertimeDropdowns();
+    renderOvertimeCalendar();
+    renderOvertimeList();
+    renderOvertimeSummary();
     
     // 전역 마우스 이벤트
     document.addEventListener('mouseup', () => {
@@ -2427,6 +2487,16 @@ function showTab(tabName) {
         document.getElementById('dashboardTab').classList.add('active');
         // 대시보드 탭으로 전환 시 달력 다시 렌더링
         renderCalendar();
+    } else if (tabName === 'overtime') {
+        const overtimeTab = document.getElementById('overtimeTab');
+        if (overtimeTab) {
+            overtimeTab.classList.add('active');
+        }
+        // 야근 탭 전환 시 렌더링 및 드롭다운 갱신
+        updateOvertimeDropdowns();
+        renderOvertimeCalendar();
+        renderOvertimeList();
+        renderOvertimeSummary();
     } else if (tabName === 'hr') {
         document.getElementById('hrTab').classList.add('active');
         // HR 탭으로 전환 시 HR 데이터 로드
