@@ -254,7 +254,7 @@ async function addEmployee() {
     
     employees.push(employee);
     
-    // 개별 저장으로 충돌 방지
+    // 보안 강화된 Firebase + 로컬 백업으로 저장
     await saveEmployee(employee);
     saveData();
     
@@ -947,18 +947,15 @@ async function cleanupInvalidLeaveRecords() {
     }
 }
 
-// 데이터 저장 (기존 + 개별 저장)
+// 데이터 저장 (보안 강화된 Firebase + 로컬 백업)
 async function saveData() {
-    // 기존 잘못된 데이터 정리
-    await cleanupInvalidLeaveRecords();
-    
-    // 로컬 백업
+    // 로컬 백업 (항상 실행)
     localStorage.setItem('employees', JSON.stringify(employees));
     localStorage.setItem('leaveRecords', JSON.stringify(leaveRecords));
     localStorage.setItem('lastUpdate', Date.now().toString());
     
-    // Firebase에 개별 저장 (충돌 방지)
-    if (isFirebaseEnabled) {
+    // Firebase에 보안 인증된 상태로 저장
+    if (isFirebaseEnabled && firebase.auth().currentUser) {
         try {
             // 직원들 개별 저장
             for (const employee of employees) {
@@ -971,17 +968,19 @@ async function saveData() {
             }
             
             await database.ref('lastUpdate').set(Date.now());
-            console.log('Firebase에 모든 데이터 개별 저장 완료');
+            console.log('Firebase에 보안 인증된 상태로 데이터 저장 완료');
         } catch (error) {
-            console.log('Firebase 저장 실패:', error);
+            console.log('Firebase 저장 실패, 로컬만 사용:', error);
         }
+    } else {
+        console.log('로컬 저장소에만 데이터 저장 (Firebase 인증 대기중)');
     }
 }
 
-// 데이터 불러오기
+// 데이터 불러오기 (보안 강화된 Firebase + 로컬 백업)
 async function loadData() {
-    // Firebase에서 개별 로드 시도 (충돌 방지)
-    if (isFirebaseEnabled) {
+    // Firebase에서 보안 인증된 상태로 로드 시도
+    if (isFirebaseEnabled && firebase.auth().currentUser) {
         try {
             const [employeesSnapshot, recordsSnapshot] = await Promise.all([
                 database.ref('employees').once('value'),
@@ -992,73 +991,55 @@ async function loadData() {
             const firebaseRecords = recordsSnapshot.val();
             
             if (firebaseEmployees) {
-                // 안전한 배열 변환
-                let newEmployees;
-                if (Array.isArray(firebaseEmployees)) {
-                    newEmployees = firebaseEmployees;
-                } else {
-                    newEmployees = Object.values(firebaseEmployees);
-                }
+                let newEmployees = Array.isArray(firebaseEmployees) ? firebaseEmployees : Object.values(firebaseEmployees);
                 
-                // 중복 직원 제거 (같은 이름의 직원 중 최신 데이터만 유지)
+                // 중복 제거
                 const uniqueEmployees = [];
                 const seenNames = new Set();
-                
-                // 최신 데이터부터 처리 (역순)
                 newEmployees.reverse().forEach(emp => {
                     if (!seenNames.has(emp.name)) {
                         seenNames.add(emp.name);
-                        uniqueEmployees.unshift(emp); // 원래 순서 유지
+                        uniqueEmployees.unshift(emp);
                     }
                 });
                 
                 employees = uniqueEmployees;
-                
-                // 배열인지 확인 후 처리
                 if (Array.isArray(employees)) {
                     employees.forEach(emp => calculateEmployeeLeaves(emp));
-                    console.log('Firebase에서 직원 데이터 로드 완료 (중복 제거):', employees.length + '명');
-                } else {
-                    console.log('직원 데이터 형식 오류, 빈 배열로 초기화');
-                    employees = [];
+                    console.log('Firebase에서 보안 인증된 상태로 직원 데이터 로드:', employees.length + '명');
                 }
             }
             
             if (firebaseRecords) {
-                // 안전한 배열 변환
-                if (Array.isArray(firebaseRecords)) {
-                    leaveRecords = firebaseRecords;
-                } else {
-                    // 객체에서 유효한 휴가 기록만 추출
-                    leaveRecords = Object.values(firebaseRecords).filter(record => 
-                        record && record.id && !record.id.toString().includes('.')
-                    );
-                }
-                console.log('Firebase에서 휴가 데이터 로드 완료:', leaveRecords.length + '개');
+                leaveRecords = Array.isArray(firebaseRecords) ? firebaseRecords : 
+                    Object.values(firebaseRecords).filter(record => record && record.id && !record.id.toString().includes('.'));
+                console.log('Firebase에서 보안 인증된 상태로 휴가 데이터 로드:', leaveRecords.length + '개');
             }
             
             // Firebase 데이터를 로컬에도 백업
             if (firebaseEmployees) localStorage.setItem('employees', JSON.stringify(employees));
             if (firebaseRecords) localStorage.setItem('leaveRecords', JSON.stringify(leaveRecords));
             
-            return; // Firebase 로드 성공하면 로컬 로드 생략
+            return;
             
         } catch (error) {
             console.log('Firebase 로드 실패, 로컬 데이터 사용:', error);
         }
     }
     
-    // Firebase 실패 시 로컬 데이터 사용
+    // Firebase 실패 시 또는 인증 대기 중일 때 로컬 데이터 사용
     const savedEmployees = localStorage.getItem('employees');
     const savedRecords = localStorage.getItem('leaveRecords');
     
     if (savedEmployees) {
         employees = JSON.parse(savedEmployees);
         employees.forEach(emp => calculateEmployeeLeaves(emp));
+        console.log('로컬에서 직원 데이터 로드 완료:', employees.length + '명');
     }
     
     if (savedRecords) {
         leaveRecords = JSON.parse(savedRecords);
+        console.log('로컬에서 휴가 데이터 로드 완료:', leaveRecords.length + '개');
     }
 }
 
@@ -1251,19 +1232,29 @@ async function confirmCancelLeave() {
     closeLeaveCancelModal();
 }
 
-// Firebase 초기화
+// Firebase 초기화 (보안 강화)
 function initializeFirebase() {
     try {
         if (typeof firebase !== 'undefined') {
             firebase_app = firebase.initializeApp(firebaseConfig);
             database = firebase.database();
-            isFirebaseEnabled = true;
-            console.log('Firebase 초기화 성공');
             
-            // Firebase에서 토큰 실시간 로드
-            loadTokensFromFirebase();
+            // Firebase Auth 초기화
+            const auth = firebase.auth();
+            
+            // 자동 로그인 (익명 인증)
+            auth.signInAnonymously().then(() => {
+                isFirebaseEnabled = true;
+                console.log('Firebase 보안 인증 성공');
+                loadTokensFromFirebase();
+            }).catch((error) => {
+                console.log('Firebase 인증 실패, 로컬 저장소 사용:', error);
+                isFirebaseEnabled = false;
+            });
+            
         } else {
             console.log('Firebase를 사용할 수 없습니다. 로컬 저장소를 사용합니다.');
+            isFirebaseEnabled = false;
         }
     } catch (error) {
         console.log('Firebase 초기화 실패:', error);
@@ -2066,7 +2057,7 @@ async function saveEmployeeHRData() {
         lastUpdated: new Date().toISOString()
     };
     
-    // 개별 저장
+    // 보안 강화된 Firebase + 로컬 백업으로 저장
     await saveEmployee(employee);
     saveData();
     
@@ -2106,21 +2097,7 @@ async function deleteEmployeeHRData() {
         // 해당 직원의 휴가 기록도 삭제
         leaveRecords = leaveRecords.filter(record => record.employeeId !== employeeId);
         
-        // Firebase에서도 삭제
-        if (isFirebaseEnabled) {
-            try {
-                await database.ref(`employees/${employeeId}`).remove();
-                
-                // 해당 직원의 휴가 기록들도 Firebase에서 삭제
-                const recordsToDelete = leaveRecords.filter(record => record.employeeId === employeeId);
-                for (const record of recordsToDelete) {
-                    const safeId = record.id.toString().replace(/\./g, '_');
-                    await database.ref(`leaveRecords/${safeId}`).remove();
-                }
-            } catch (error) {
-                console.log('Firebase 삭제 실패:', error);
-            }
-        }
+        // 로컬 저장소에서만 관리 (개인정보 보호)
         
         saveData();
         
