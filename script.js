@@ -949,8 +949,18 @@ async function cleanupInvalidLeaveRecords() {
 
 // 데이터 저장 (보안 강화된 Firebase + 로컬 백업)
 async function saveData() {
-    // 로컬 백업 (항상 실행)
-    localStorage.setItem('employees', JSON.stringify(employees));
+    // 로컬 백업 (민감정보 제외)
+    const sanitizedEmployees = employees.map(emp => ({
+        ...emp,
+        hrData: emp.hrData ? {
+            ...emp.hrData,
+            phone: emp.hrData.phone ? '***숨김***' : '',
+            ssn: emp.hrData.ssn ? '***숨김***' : '',
+            address: emp.hrData.address ? '***숨김***' : ''
+        } : undefined
+    }));
+    
+    localStorage.setItem('employees', JSON.stringify(sanitizedEmployees));
     localStorage.setItem('leaveRecords', JSON.stringify(leaveRecords));
     localStorage.setItem('lastUpdate', Date.now().toString());
     
@@ -1897,6 +1907,59 @@ async function logout() {
     }
 }
 
+// ===== 보안 암호화 기능 =====
+
+// 간단한 AES 스타일 암호화 (실제 운영시에는 더 강력한 암호화 필요)
+function encryptSensitiveData(data, key = 'HRMS_SECRET_KEY_2025') {
+    if (!data) return '';
+    
+    try {
+        // Base64 인코딩 + 간단한 XOR 암호화
+        let encrypted = '';
+        for (let i = 0; i < data.length; i++) {
+            encrypted += String.fromCharCode(data.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+        }
+        return btoa(encrypted); // Base64 인코딩
+    } catch (error) {
+        console.log('암호화 실패:', error);
+        return data; // 실패시 원본 반환 (임시)
+    }
+}
+
+// 복호화 함수
+function decryptSensitiveData(encryptedData, key = 'HRMS_SECRET_KEY_2025') {
+    if (!encryptedData) return '';
+    
+    try {
+        // Base64 디코딩 + XOR 복호화
+        const decoded = atob(encryptedData);
+        let decrypted = '';
+        for (let i = 0; i < decoded.length; i++) {
+            decrypted += String.fromCharCode(decoded.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+        }
+        return decrypted;
+    } catch (error) {
+        console.log('복호화 실패:', error);
+        return encryptedData; // 실패시 암호화된 데이터 반환
+    }
+}
+
+// 민감정보 마스킹 (표시용)
+function maskSensitiveData(data, type) {
+    if (!data) return '';
+    
+    switch (type) {
+        case 'ssn':
+            return data.length > 8 ? data.substring(0, 8) + '******' : data;
+        case 'phone':
+            return data.length > 7 ? data.substring(0, 7) + '****' : data;
+        case 'address':
+            return data.length > 10 ? data.substring(0, 10) + '...' : data;
+        default:
+            return data;
+    }
+}
+
 // ===== HR 관리 기능 =====
 
 // 탭 전환 함수
@@ -1951,16 +2014,28 @@ function loadEmployeeHRData() {
     const employee = employees.find(emp => emp.id === employeeId);
     if (!employee) return;
     
-    // HR 폼에 데이터 채우기
+    // HR 폼에 데이터 채우기 (민감정보 복호화)
+    const hrData = employee.hrData || {};
+    
     document.getElementById('hrEmployeeName').value = employee.name || '';
     document.getElementById('hrJoinDate').value = employee.joinDate || '';
-    document.getElementById('hrLeaveDate').value = employee.hrData?.leaveDate || '';
-    document.getElementById('hrPhone').value = employee.hrData?.phone || '';
-    document.getElementById('hrSsn').value = employee.hrData?.ssn || '';
-    document.getElementById('hrDepartment').value = employee.hrData?.department || '';
-    document.getElementById('hrPosition').value = employee.hrData?.position || '';
-    document.getElementById('hrAddress').value = employee.hrData?.address || '';
-    document.getElementById('hrNotes').value = employee.hrData?.notes || '';
+    document.getElementById('hrLeaveDate').value = hrData.leaveDate || '';
+    
+    // 암호화된 데이터 복호화
+    if (hrData.encrypted) {
+        document.getElementById('hrPhone').value = hrData.phone ? decryptSensitiveData(hrData.phone) : '';
+        document.getElementById('hrSsn').value = hrData.ssn ? decryptSensitiveData(hrData.ssn) : '';
+        document.getElementById('hrAddress').value = hrData.address ? decryptSensitiveData(hrData.address) : '';
+    } else {
+        // 기존 암호화되지 않은 데이터 (하위 호환)
+        document.getElementById('hrPhone').value = hrData.phone || '';
+        document.getElementById('hrSsn').value = hrData.ssn || '';
+        document.getElementById('hrAddress').value = hrData.address || '';
+    }
+    
+    document.getElementById('hrDepartment').value = hrData.department || '';
+    document.getElementById('hrPosition').value = hrData.position || '';
+    document.getElementById('hrNotes').value = hrData.notes || '';
 }
 
 // HR 폼 초기화
@@ -2045,16 +2120,17 @@ async function saveEmployeeHRData() {
         employees.push(employee);
     }
     
-    // HR 데이터 저장
+    // HR 데이터 저장 (민감정보 암호화)
     employee.hrData = {
         leaveDate: leaveDate,
-        phone: phone,
-        ssn: ssn,
+        phone: phone ? encryptSensitiveData(phone) : '', // 전화번호 암호화
+        ssn: ssn ? encryptSensitiveData(ssn) : '', // 주민번호 암호화
         department: department,
         position: position,
-        address: address,
+        address: address ? encryptSensitiveData(address) : '', // 주소 암호화
         notes: notes,
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
+        encrypted: true // 암호화 플래그
     };
     
     // 보안 강화된 Firebase + 로컬 백업으로 저장
@@ -2158,7 +2234,7 @@ function renderHREmployeeList() {
                 </div>
                 <div class="hr-info-item">
                     <span class="hr-info-label">연락처:</span>
-                    <span>${hrData.phone || '미등록'}</span>
+                    <span>${hrData.phone ? (hrData.encrypted ? maskSensitiveData(decryptSensitiveData(hrData.phone), 'phone') : maskSensitiveData(hrData.phone, 'phone')) : '미등록'}</span>
                 </div>
                 ${hrData.leaveDate ? `
                 <div class="hr-info-item">
