@@ -1868,9 +1868,9 @@ function subscribeRealtimeData() {
         if (map) {
             try {
                 overtimeRecords = Array.isArray(map) ? map : Object.values(map);
-                renderOvertimeCalendar();
-                renderOvertimeList();
-                renderOvertimeSummary();
+                // renderOvertimeCalendar(); // 초과근무 달력 기능 비활성화
+                // renderOvertimeList(); // 초과근무 목록 기능 비활성화
+                // renderOvertimeSummary(); // 초과근무 요약 기능 비활성화
                 console.log('🔥 야근 데이터 실시간 업데이트:', overtimeRecords.length + '개');
             } catch (e) {
                 console.log('야근 데이터 실시간 업데이트 실패:', e);
@@ -1941,9 +1941,9 @@ async function initializeApp() {
 
     // 초기 야근 UI 렌더링 및 드롭다운 구성
     updateOvertimeDropdowns();
-    renderOvertimeCalendar();
-    renderOvertimeList();
-    renderOvertimeSummary();
+    // renderOvertimeCalendar(); // 초과근무 달력 기능 비활성화
+    // renderOvertimeList(); // 초과근무 목록 기능 비활성화
+    // renderOvertimeSummary(); // 초과근무 요약 기능 비활성화
     
     // 전역 마우스 이벤트
     document.addEventListener('mouseup', () => {
@@ -2354,22 +2354,34 @@ async function aesEncrypt(plaintext) {
 
 // AES-GCM 복호화 (웹크립토 API 사용)
 async function aesDecrypt(encObj) {
+    // 입력 유효성 검사
+    if (!encObj || typeof encObj !== 'object') {
+        console.warn('AES 복호화: 잘못된 입력 형식');
+        return '';
+    }
+
+    if (!encObj.iv || !encObj.ciphertext) {
+        console.warn('AES 복호화: 필수 필드 누락 (iv, ciphertext)');
+        return '';
+    }
+
     if (!SESSION_CRYPTO_KEY) {
         await promptAndDeriveKey();
         if (!SESSION_CRYPTO_KEY) return '';
     }
-    
+
     try {
         const iv = Uint8Array.from(atob(encObj.iv), c => c.charCodeAt(0));
         const ct = Uint8Array.from(atob(encObj.ciphertext), c => c.charCodeAt(0));
         const ptBuf = await crypto.subtle.decrypt(
-            { name: 'AES-GCM', iv }, 
-            SESSION_CRYPTO_KEY, 
+            { name: 'AES-GCM', iv },
+            SESSION_CRYPTO_KEY,
             ct
         );
         return new TextDecoder().decode(ptBuf);
     } catch (error) {
-        console.error('AES 복호화 실패:', error);
+        console.error('AES 복호화 실패:', error.name || error);
+        // 복호화 실패시 빈 문자열 반환 (앱이 멈추지 않도록)
         return '';
     }
 }
@@ -2655,9 +2667,9 @@ function showTab(tabName) {
         }
         // 야근 탭 전환 시 렌더링 및 드롭다운 갱신
         updateOvertimeDropdowns();
-        renderOvertimeCalendar();
-        renderOvertimeList();
-        renderOvertimeSummary();
+        // renderOvertimeCalendar(); // 초과근무 달력 기능 비활성화
+        // renderOvertimeList(); // 초과근무 목록 기능 비활성화
+        // renderOvertimeSummary(); // 초과근무 요약 기능 비활성화
     } else if (tabName === 'hr') {
         document.getElementById('hrTab').classList.add('active');
         // HR 탭으로 전환 시 HR 데이터 로드
