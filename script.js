@@ -892,8 +892,14 @@ async function deleteLeaveRecord(leaveId) {
     }
 }
 
-// 기존 잘못된 휴가 기록 완전 정리
+// 기존 잘못된 휴가 기록 완전 정리 (비활성화 - 데이터 보호)
 async function cleanupInvalidLeaveRecords() {
+    // 데이터 손실 방지를 위해 비활성화
+    console.log('휴가 기록 정리 함수 비활성화됨 (데이터 보호)');
+    return;
+    
+    // 원래 로직 주석 처리 (필요시 수동 실행)
+    /*
     if (!isFirebaseEnabled) return;
     
     try {
@@ -918,6 +924,7 @@ async function cleanupInvalidLeaveRecords() {
     } catch (error) {
         console.log('휴가 기록 정리 실패:', error);
     }
+    */
 }
 
 // 데이터 저장 (보안 강화된 Firebase + 로컬 백업)
