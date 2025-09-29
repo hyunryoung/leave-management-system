@@ -152,41 +152,11 @@ async function loadHolidays(year) {
 
 // 페이지 로드 시 초기화
 document.addEventListener('DOMContentLoaded', async function() {
-    // Firebase 초기화 시도
+    // Firebase 초기화 시도 (이메일/비밀번호 인증)
     initializeFirebase();
     
     // 관리자가 생성한 토큰들 로드
     loadActiveTokens();
-    
-    // Firebase 토큰 구독이 켜졌다면, 처음 동기화 끝날 때까지 대기
-    if (isFirebaseEnabled) {
-        await waitForInitialTokensLoad();
-    }
-    
-    // 토큰 기반 인증 체크 (비동기)
-    if (!(await checkTokenAuthentication())) {
-        return;
-    }
-    
-    await loadData(); // Firebase에서 데이터 우선 로드
-    updateCurrentTime();
-    setInterval(updateCurrentTime, 1000); // 매초 시간 업데이트
-    await renderCalendar(); // 공휴일 로드 포함
-    renderEmployeeSummary();
-    updateModalEmployeeDropdown();
-    
-    // 매일 자정에 연차/월차 자동 계산
-    setInterval(calculateLeaves, 60000); // 1분마다 체크
-    
-    // 전역 마우스 이벤트
-    document.addEventListener('mouseup', () => {
-        if (isSelecting) {
-            isSelecting = false;
-            if (selectedDates.length > 0) {
-                openLeaveModal();
-            }
-        }
-    });
 });
 
 // 현재 시간 업데이트
@@ -1252,33 +1222,30 @@ function initializeFirebase() {
             // Firebase Auth 초기화
             const auth = firebase.auth();
             
-            // 보안 강화된 커스텀 토큰 인증
-            auth.signInAnonymously().then(async (userCredential) => {
-                const user = userCredential.user;
-                
-                // 사용자 역할 정보를 Custom Claims로 설정
-                const currentUserToken = sessionStorage.getItem('accessToken');
-                const tokenInfo = ACCESS_TOKENS[currentUserToken];
-                
-                if (tokenInfo && tokenInfo.role) {
-                    // Firebase Admin SDK가 필요하므로 클라이언트에서는 시뮬레이션
-                    // 실제 운영시에는 서버에서 Custom Claims 설정
-                    console.log(`Firebase 인증 성공 - 역할: ${tokenInfo.role}`);
+            // 운영용 이메일/비밀번호 인증 (익명 인증 제거)
+            // Firebase 인증 상태 감시
+            auth.onAuthStateChanged(async (user) => {
+                if (user) {
+                    // 로그인된 사용자의 Custom Claims에서 역할 가져오기
+                    const idTokenResult = await user.getIdTokenResult(true);
+                    const role = idTokenResult.claims.role || 'user';
+                    const email = user.email;
                     
-                    // 역할 기반 접근 제어 시뮬레이션
-                    user.customClaims = {
-                        role: tokenInfo.role,
-                        name: tokenInfo.name,
-                        expires: tokenInfo.expires
-                    };
+                    // 세션에 사용자 정보 저장
+                    sessionStorage.setItem('userRole', role);
+                    sessionStorage.setItem('userName', email.split('@')[0]);
+                    sessionStorage.setItem('userEmail', email);
+                    
+                    isFirebaseEnabled = true;
+                    console.log(`Firebase 인증 성공 - 이메일: ${email}, 역할: ${role}`);
+                    
+                    // 앱 초기화
+                    await initializeApp();
+                } else {
+                    // 로그인되지 않은 상태 - 로그인 모달 표시
+                    isFirebaseEnabled = false;
+                    showFirebaseLoginModal();
                 }
-                
-                isFirebaseEnabled = true;
-                console.log('Firebase 보안 인증 성공 (Custom Claims)');
-                loadTokensFromFirebase();
-            }).catch((error) => {
-                console.log('Firebase 인증 실패, 로컬 저장소 사용:', error);
-                isFirebaseEnabled = false;
             });
             
         } else {
@@ -1711,8 +1678,10 @@ async function cleanupFirebaseData() {
     }
 }
 
-// 메인 앱 초기화
+// 메인 앱 초기화 (Firebase 로그인 후 호출)
 async function initializeApp() {
+    console.log('앱 초기화 시작...');
+    
     await loadData(); // Firebase에서 데이터 로드
     
     // 한 번만 데이터 정리 실행 (관리자만)
@@ -1724,15 +1693,27 @@ async function initializeApp() {
     
     updateCurrentTime();
     setInterval(updateCurrentTime, 1000);
-    renderCalendar();
+    await renderCalendar(); // 공휴일 로드 포함
     renderEmployeeSummary();
     updateModalEmployeeDropdown();
     startRealTimeSync();
-    subscribeRealtimeData(); // ★ 추가: 다른 PC 변경 즉시 반영
+    subscribeRealtimeData(); // 다른 PC 변경 즉시 반영
     setupUIPermissions(); // UI 권한 설정
     
     // 매일 자정에 연차/월차 자동 계산
     setInterval(calculateLeaves, 60000);
+    
+    // 전역 마우스 이벤트
+    document.addEventListener('mouseup', () => {
+        if (isSelecting) {
+            isSelecting = false;
+            if (selectedDates.length > 0) {
+                openLeaveModal();
+            }
+        }
+    });
+    
+    console.log('앱 초기화 완료!');
 }
 
 // 실시간 동기화 시작
@@ -1958,6 +1939,7 @@ async function logout() {
         // Firebase 인증 로그아웃
         if (isFirebaseEnabled && firebase.auth().currentUser) {
             await firebase.auth().signOut();
+            console.log('Firebase 로그아웃 완료');
         }
         
         if (syncInterval) {
@@ -1965,6 +1947,114 @@ async function logout() {
         }
         userToken = null;
         location.reload();
+    }
+}
+
+// ===== Firebase 로그인 기능 =====
+
+// Firebase 로그인 모달 표시
+function showFirebaseLoginModal() {
+    const loginModal = document.createElement('div');
+    loginModal.id = 'firebaseLoginModal';
+    loginModal.className = 'modal';
+    loginModal.style.display = 'block';
+    
+    loginModal.innerHTML = `
+        <div class="modal-content" style="max-width: 450px; text-align: center;">
+            <h3>🔐 휴가 관리 시스템 로그인</h3>
+            <div style="margin: 20px 0;">
+                <p><strong>관리자가 발급한 계정으로 로그인하세요.</strong></p>
+                
+                <div class="firebase-login-form" style="text-align: left; margin: 20px 0;">
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">이메일:</label>
+                        <input type="email" id="firebaseEmail" placeholder="admin@company.com" 
+                               style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px;">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">비밀번호:</label>
+                        <input type="password" id="firebasePassword" placeholder="비밀번호" 
+                               style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px;">
+                    </div>
+                    <div id="firebaseLoginError" style="color: red; margin: 10px 0; display: none; font-size: 14px;"></div>
+                </div>
+                
+                <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin: 15px 0; text-align: left; font-size: 13px;">
+                    <strong>📋 테스트 계정:</strong><br>
+                    <strong>관리자:</strong> admin@company.com / admin123<br>
+                    <strong>매니저:</strong> manager@company.com / manager123<br>
+                    <strong>직원:</strong> staff@company.com / staff123
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button onclick="attemptFirebaseLogin()" style="background: #667eea; color: white; padding: 12px 25px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: 600;">로그인</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(loginModal);
+    
+    // Enter 키로 로그인
+    document.getElementById('firebasePassword').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            attemptFirebaseLogin();
+        }
+    });
+    
+    // 포커스
+    setTimeout(() => {
+        document.getElementById('firebaseEmail').focus();
+    }, 100);
+}
+
+// Firebase 로그인 시도
+async function attemptFirebaseLogin() {
+    const email = document.getElementById('firebaseEmail').value.trim();
+    const password = document.getElementById('firebasePassword').value.trim();
+    const errorDiv = document.getElementById('firebaseLoginError');
+    
+    if (!email || !password) {
+        errorDiv.textContent = '이메일과 비밀번호를 입력해주세요.';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    
+    try {
+        // Firebase 이메일/비밀번호 로그인
+        const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+        
+        // Custom Claims에서 역할 가져오기
+        const idTokenResult = await user.getIdTokenResult(true);
+        const role = idTokenResult.claims.role || 'user';
+        
+        console.log(`로그인 성공: ${email}, 역할: ${role}`);
+        
+        // 로그인 모달 제거
+        document.getElementById('firebaseLoginModal').remove();
+        
+        // Firebase 인증 상태 변경으로 자동으로 앱 초기화됨
+        
+    } catch (error) {
+        console.log('Firebase 로그인 실패:', error);
+        
+        let errorMessage = '로그인에 실패했습니다.';
+        if (error.code === 'auth/user-not-found') {
+            errorMessage = '등록되지 않은 이메일입니다.';
+        } else if (error.code === 'auth/wrong-password') {
+            errorMessage = '비밀번호가 틀렸습니다.';
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = '이메일 형식이 올바르지 않습니다.';
+        } else if (error.code === 'auth/too-many-requests') {
+            errorMessage = '너무 많은 시도로 일시적으로 차단되었습니다.';
+        }
+        
+        errorDiv.textContent = errorMessage;
+        errorDiv.style.display = 'block';
+        
+        // 비밀번호 필드 초기화
+        document.getElementById('firebasePassword').value = '';
+        document.getElementById('firebasePassword').focus();
     }
 }
 
