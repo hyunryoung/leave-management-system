@@ -67,6 +67,12 @@ async function createUser(email, password, role) {
     // await createUser('hr@yourcompany.com', 'your_secure_password', 'admin');
     // await createUser('team_manager@yourcompany.com', 'your_secure_password', 'manager');
     
+    // Google 로그인 사용자에게 역할 부여 (이메일만으로)
+    // 먼저 웹에서 Google 로그인을 한 번 해서 사용자가 생성되어야 함
+    // await setRole('your_google_email@gmail.com', 'admin');
+    // await setRole('manager_email@company.com', 'manager');
+    // await setRole('employee_email@gmail.com', 'user');
+    
     console.log('\n✅ 모든 설정이 완료되었습니다!');
     console.log('\n📋 다음 단계:');
     console.log('1. Firebase Console → Authentication → 로그인 방법 → 이메일/비밀번호 활성화');

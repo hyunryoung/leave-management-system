@@ -1988,6 +1988,7 @@ function showFirebaseLoginModal() {
             </div>
             <div class="modal-buttons">
                 <button onclick="attemptFirebaseLogin()" style="background: #667eea; color: white; padding: 12px 25px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: 600;">로그인</button>
+                <button onclick="attemptFirebaseGoogleLogin()" style="margin-left: 8px; padding: 12px 25px; background: #db4437; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: 600;">Google로 로그인</button>
             </div>
         </div>
     `;
@@ -2055,6 +2056,53 @@ async function attemptFirebaseLogin() {
         // 비밀번호 필드 초기화
         document.getElementById('firebasePassword').value = '';
         document.getElementById('firebasePassword').focus();
+    }
+}
+
+// Google 로그인 시도
+async function attemptFirebaseGoogleLogin() {
+    try {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        
+        // 회사 도메인만 허용하려면 다음 줄 주석 해제:
+        // provider.setCustomParameters({ hd: 'yourcompany.com' });
+        
+        // 추가 권한 요청 (선택사항)
+        provider.addScope('email');
+        provider.addScope('profile');
+        
+        console.log('Google 로그인 시도 중...');
+        
+        // Google 팝업으로 로그인
+        const result = await firebase.auth().signInWithPopup(provider);
+        const user = result.user;
+        
+        console.log(`Google 로그인 성공: ${user.email}`);
+        
+        // 로그인 모달 제거
+        const loginModal = document.getElementById('firebaseLoginModal');
+        if (loginModal) {
+            loginModal.remove();
+        }
+        
+        // onAuthStateChanged가 자동으로 initializeApp()을 실행함
+        
+    } catch (error) {
+        console.log('Google 로그인 실패:', error);
+        
+        let errorMessage = 'Google 로그인에 실패했습니다.';
+        
+        if (error.code === 'auth/popup-closed-by-user') {
+            errorMessage = '로그인 창이 닫혔습니다.';
+        } else if (error.code === 'auth/popup-blocked') {
+            errorMessage = '팝업이 차단되었습니다. 팝업 차단을 해제해주세요.';
+        } else if (error.code === 'auth/cancelled-popup-request') {
+            errorMessage = '로그인이 취소되었습니다.';
+        } else if (error.code === 'auth/network-request-failed') {
+            errorMessage = '네트워크 연결을 확인해주세요.';
+        }
+        
+        alert(errorMessage);
     }
 }
 
