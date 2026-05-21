@@ -3009,17 +3009,23 @@ function subscribeRealtimeData() {
                 if (Array.isArray(firebaseRecords)) {
                     newRecords = firebaseRecords;
                 } else {
-                    newRecords = Object.values(firebaseRecords).filter(record => 
+                    newRecords = Object.values(firebaseRecords).filter(record =>
                         record && record.id && !record.id.toString().includes('.')
                     );
                 }
-                
+
                 // 완전히 교체 (중복 방지)
                 leaveRecords = [...newRecords];
-                
+
+                // 다른 PC에서 휴가 변경 시에도 잔여 사용량이 정확하게 반영되도록
+                // 휴가 기록 기반으로 직원별 usedMonthly/usedAnnual 재계산
+                // (캐시는 today.toDateString() 키라 무효화하지 않으면 옛 값이 그대로 나옴)
+                clearLeaveCache();
+                employees.forEach(emp => calculateEmployeeLeaves(emp));
+
                 renderEmployeeSummary();
                 renderCalendar();
-                console.log('🔥 휴가 데이터 실시간 업데이트 (중복 방지):', leaveRecords.length + '개');
+                console.log('🔥 휴가 데이터 실시간 업데이트 (사용량 재계산):', leaveRecords.length + '개');
             } catch (error) {
                 console.log('휴가 데이터 실시간 업데이트 실패:', error);
             }
