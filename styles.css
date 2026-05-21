@@ -2528,6 +2528,17 @@ button[type="submit"]:hover,
 .calendar > div, .overtime-calendar > div {
     background: var(--bg-card) !important;
 }
+/* 요일 헤더는 위 강제 배경 룰(!important)을 다시 덮어써야 보임 */
+.calendar > div.calendar-header,
+.overtime-calendar > div.calendar-header {
+    background: #667eea !important;
+    color: #ffffff !important;
+}
+[data-theme="dark"] .calendar > div.calendar-header,
+[data-theme="dark"] .overtime-calendar > div.calendar-header {
+    background: var(--accent-primary, #667eea) !important;
+    color: #ffffff !important;
+}
 .calendar .day-header,
 .overtime-calendar .day-header {
     background: var(--bg-secondary) !important;
