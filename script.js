@@ -945,6 +945,29 @@ function calculateEmployeeLeavesWithCache(employee) {
     });
 }
 
+// ===== 근속 기간 계산 (입사 기념일 기준) =====
+// 만 근속 연수. 입사 기념일을 지나야 +1.
+// 기존 Math.floor(일수/365) 방식은 윤년 누적으로 기념일보다 하루 이상 빨리
+// 연차(年)가 올라가는 off-by-one 오차가 있어 기념일 기준으로 통일함.
+function getYearsOfService(joinDate, refDate = new Date()) {
+    const join = (joinDate instanceof Date) ? joinDate : new Date(joinDate);
+    const ref = (refDate instanceof Date) ? refDate : new Date(refDate);
+    let years = ref.getFullYear() - join.getFullYear();
+    const anniversary = new Date(ref.getFullYear(), join.getMonth(), join.getDate());
+    if (ref < anniversary) years -= 1;
+    return Math.max(0, years);
+}
+
+// 근무기간 표시용 (년/개월) - 달력 기준. years는 getYearsOfService와 일치함.
+function getServiceDuration(joinDate, refDate = new Date()) {
+    const join = (joinDate instanceof Date) ? joinDate : new Date(joinDate);
+    const ref = (refDate instanceof Date) ? refDate : new Date(refDate);
+    let totalMonths = (ref.getFullYear() - join.getFullYear()) * 12 + (ref.getMonth() - join.getMonth());
+    if (ref.getDate() < join.getDate()) totalMonths -= 1;
+    totalMonths = Math.max(0, totalMonths);
+    return { years: Math.floor(totalMonths / 12), months: totalMonths % 12 };
+}
+
 // 휴가 기록에서 직원별 사용량 계산 (데이터 동기화 보장)
 function calculateUsedLeavesFromRecords(employeeId, annualCycleStart = null) {
     let usedAnnual = 0;
@@ -986,9 +1009,9 @@ function calculateEmployeeLeaves(employee) {
     const today = new Date();
     const joinDate = new Date(employee.joinDate);
     
-    // 근무일수 계산
+    // 근무일수 (로그용) + 입사 기념일 기준 만 근속 연수
     const daysDiff = Math.floor((today - joinDate) / (1000 * 60 * 60 * 24));
-    const yearsOfService = Math.floor(daysDiff / 365);
+    const yearsOfService = getYearsOfService(joinDate, today);
     
     // 1년 미만 직원 - 월차만 지급
     if (yearsOfService < 1) {
@@ -1140,9 +1163,7 @@ function renderEmployeeSummary() {
     employees.forEach(employee => {
         const joinDate = new Date(employee.joinDate);
         const today = new Date();
-        const daysDiff = Math.floor((today - joinDate) / (1000 * 60 * 60 * 24));
-        const years = Math.floor(daysDiff / 365);
-        const months = Math.floor((daysDiff % 365) / 30);
+        const { years, months } = getServiceDuration(joinDate, today);
         
         const card = document.createElement('div');
         card.className = 'employee-card';
@@ -1562,7 +1583,7 @@ async function registerLeave() {
     // 1년 미만 직원은 월차만, 1년 이상 직원은 연차만 사용 가능 (차감 대상만 체크)
     const currentDate = new Date();
     const joinDate = new Date(employee.joinDate);
-    const yearsOfService = Math.floor((currentDate - joinDate) / (1000 * 60 * 60 * 24 * 365));
+    const yearsOfService = getYearsOfService(joinDate, currentDate);
     
     if (yearsOfService < 1 && leaveType === 'annual') {
         alert('1년 미만 직원은 연차를 사용할 수 없습니다. 월차를 선택해주세요.');
@@ -2078,9 +2099,7 @@ function showEmployeeDetail(employeeId) {
     
     const today = new Date();
     const joinDate = new Date(employee.joinDate);
-    const daysDiff = Math.floor((today - joinDate) / (1000 * 60 * 60 * 24));
-    const years = Math.floor(daysDiff / 365);
-    const months = Math.floor((daysDiff % 365) / 30);
+    const { years, months } = getServiceDuration(joinDate, today);
     
     let leaveInfo = '';
     if (years < 1) {
@@ -2244,7 +2263,7 @@ function openLeaveEditModal() {
     // 1년 미만/이상 직원에 따른 휴가 종류 제한 (휴가/병결은 항상 가능)
     const today = new Date();
     const joinDate = new Date(employee.joinDate);
-    const yearsOfService = Math.floor((today - joinDate) / (1000 * 60 * 60 * 24 * 365));
+    const yearsOfService = getYearsOfService(joinDate, today);
 
     const leaveTypeSelect = document.getElementById('editLeaveType');
     if (yearsOfService < 1) {
@@ -4205,9 +4224,7 @@ function renderHREmployeeList() {
         
         const joinDate = new Date(employee.joinDate);
         const today = new Date();
-        const daysDiff = Math.floor((today - joinDate) / (1000 * 60 * 60 * 24));
-        const years = Math.floor(daysDiff / 365);
-        const months = Math.floor((daysDiff % 365) / 30);
+        const { years, months } = getServiceDuration(joinDate, today);
         
         const hrData = employee.hrData || {};
         const isActive = !hrData.leaveDate || new Date(hrData.leaveDate) > today;
