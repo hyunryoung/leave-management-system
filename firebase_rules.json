@@ -1,28 +1,54 @@
 {
   "rules": {
+    ".read": false,
+    ".write": false,
+
+    "authorized_users": {
+      ".read":  "auth != null && (auth.token.email === 'shr941207@gmail.com' || root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('role').val() === 'admin')",
+      ".write": "auth != null && (auth.token.email === 'shr941207@gmail.com' || root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('role').val() === 'admin')",
+      "$emailKey": {
+        ".read": "auth != null",
+        "lastUsed": {
+          ".write": "auth != null"
+        }
+      }
+    },
+
+    "authorized_users_by_uid": {
+      "$uid": {
+        ".read":  "auth != null && (auth.uid === $uid || auth.token.email === 'shr941207@gmail.com' || root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('role').val() === 'admin')",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.email === 'shr941207@gmail.com' || root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('role').val() === 'admin')"
+      }
+    },
+
     "employees": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read":  "auth != null && root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('status').val() === 'active'",
+      ".write": "auth != null && root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('status').val() === 'active'"
     },
+
     "leaveRecords": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read":  "auth != null && root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('status').val() === 'active'",
+      ".write": "auth != null && root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('status').val() === 'active'"
     },
-    "tokens": {
-      ".read": "auth != null && (auth.token.email == 'shr941207@gmail.com' || root.child('users').child(auth.uid).child('role').val() == 'admin')",
-      ".write": "auth != null && (auth.token.email == 'shr941207@gmail.com' || root.child('users').child(auth.uid).child('role').val() == 'admin')"
-    },
+
     "overtimeRecords": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read":  "auth != null && root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('status').val() === 'active'",
+      ".write": "auth != null && root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('status').val() === 'active'"
     },
+
+    "tokens": {
+      ".read":  "auth != null && (auth.token.email === 'shr941207@gmail.com' || root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('role').val() === 'admin')",
+      ".write": "auth != null && (auth.token.email === 'shr941207@gmail.com' || root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('role').val() === 'admin')"
+    },
+
     "apiKeys": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read":  "auth != null && (auth.token.email === 'shr941207@gmail.com' || root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('role').val() === 'admin')",
+      ".write": "auth != null && (auth.token.email === 'shr941207@gmail.com' || root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('role').val() === 'admin')"
     },
+
     "slackConfig": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read":  "auth != null && (auth.token.email === 'shr941207@gmail.com' || root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('role').val() === 'admin')",
+      ".write": "auth != null && (auth.token.email === 'shr941207@gmail.com' || root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('role').val() === 'admin')"
     }
   }
 }

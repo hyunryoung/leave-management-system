@@ -1,13 +1,4 @@
-// 활성 토큰 목록 - 관리자가 업데이트하는 파일
-// [2026-04-17 보안 업데이트] 이전 토큰 전부 무효화 (깃허브 공개 저장소에 노출됐었음)
+// 활성 토큰 목록
+// [2026-06-01 보안 업데이트] 토큰은 Firebase RTDB의 `tokens/` 노드에서만 관리됨.
+// 이 파일은 하위 호환을 위해 빈 셸로 유지됨. 코드에 토큰을 절대 박지 말 것.
 window.ACTIVE_TOKENS = {};
-
-// 마스터 관리자 토큰 (최초 설정용)
-window.MASTER_TOKEN = 'MASTER-ADMIN-2026-DYQ0TX-DIZ2K4';
-if (!window.ACTIVE_TOKENS[window.MASTER_TOKEN]) {
-    window.ACTIVE_TOKENS[window.MASTER_TOKEN] = {
-        name: '마스터 관리자',
-        role: 'admin',
-        expires: '2027-12-31'
-    };
-}

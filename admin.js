@@ -27,14 +27,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Firebase 초기화
     initializeFirebase();
     
-    // GitHub의 tokens.js에서 기존 토큰들 로드
+    // GitHub의 tokens.js에서 기존 토큰들 로드 (레거시 호환)
     loadTokensFromGitHub();
-    
-    // Firebase에서 토큰들 로드
+
+    // Firebase에서 토큰들 로드 (단일 진실원)
     loadTokensFromFirebase();
-    
-    // 최초 실행 시 마스터 관리자 토큰 생성
-    initializeMasterToken();
     
     // Enter 키로 관리자 로그인
     const adminPwInput = document.getElementById('adminPassword');
@@ -187,39 +184,6 @@ function loadTokensFromGitHub() {
     } catch (error) {
         console.log('GitHub 토큰 로드 실패:', error);
     }
-}
-
-// 최초 마스터 관리자 토큰 생성
-async function initializeMasterToken() {
-    // Firebase에서 토큰 로드 대기 (2초)
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Firebase에서 로드된 토큰이 있으면 생성하지 않음
-    if (Object.keys(tokenDatabase).length > 0) {
-        console.log('기존 토큰들이 있어서 마스터 토큰 생성 생략');
-        return;
-    }
-    
-    // 마스터 관리자 토큰 생성
-    const masterToken = 'MASTER-ADMIN-2026-DYQ0TX-DIZ2K4';
-    const tokenInfo = {
-        name: '마스터 관리자',
-        role: 'admin',
-        expires: '2027-12-31',
-        created: new Date().toISOString(),
-        lastUsed: null,
-        status: 'active'
-    };
-
-    tokenDatabase[masterToken] = tokenInfo;
-    localStorage.setItem('tokenDatabase', JSON.stringify(tokenDatabase));
-    
-    // Firebase에도 저장
-    await saveTokenToFirebase(masterToken, tokenInfo);
-    
-    updateMainSystemTokens();
-    
-    console.log('마스터 관리자 토큰 생성됨:', masterToken);
 }
 
 // 관리자 인증
@@ -672,49 +636,10 @@ function copyToken() {
     });
 }
 
-// tokens.js 파일 생성 및 다운로드 제공
-function generateTokensFile(activeTokens) {
-    const tokensContent = `// 활성 토큰 목록 - 관리자가 업데이트하는 파일
-window.ACTIVE_TOKENS = ${JSON.stringify(activeTokens, null, 4)};
-
-// 마스터 관리자 토큰 (최초 설정용)
-window.MASTER_TOKEN = 'MASTER-ADMIN-2026-DYQ0TX-DIZ2K4';
-if (!window.ACTIVE_TOKENS[window.MASTER_TOKEN]) {
-    window.ACTIVE_TOKENS[window.MASTER_TOKEN] = {
-        name: '마스터 관리자',
-        role: 'admin', 
-        expires: '2026-12-31'
-    };
-}`;
-
-    // 기존 다운로드 링크 제거
-    const existingLink = document.getElementById('downloadTokensLink');
-    if (existingLink) {
-        existingLink.remove();
-    }
-    
-    // 새 다운로드 링크 생성
-    const blob = new Blob([tokensContent], { type: 'text/javascript' });
-    const url = URL.createObjectURL(blob);
-    
-    const downloadLink = document.createElement('a');
-    downloadLink.id = 'downloadTokensLink';
-    downloadLink.href = url;
-    downloadLink.download = 'tokens.js';
-    downloadLink.style.display = 'inline-block';
-    downloadLink.style.margin = '10px 0';
-    downloadLink.style.padding = '8px 15px';
-    downloadLink.style.background = '#007bff';
-    downloadLink.style.color = 'white';
-    downloadLink.style.textDecoration = 'none';
-    downloadLink.style.borderRadius = '5px';
-    downloadLink.textContent = '📁 tokens.js 다운로드 (GitHub 업데이트용)';
-    
-    // 토큰 생성 섹션에 추가
-    const tokenSection = document.querySelector('.token-section');
-    if (tokenSection) {
-        tokenSection.appendChild(downloadLink);
-    }
+// tokens.js 다운로드 기능은 보안상 제거됨 (Firebase RTDB가 단일 진실원)
+// 발급된 토큰은 자동으로 Firebase에 저장되며 별도 파일 배포가 필요 없음.
+function generateTokensFile(_activeTokens) {
+    // no-op: 호출부 호환 유지용 빈 함수
 }
 
 // 등록된 사용자 목록 UI 표시

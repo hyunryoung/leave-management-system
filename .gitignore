@@ -35,3 +35,20 @@ coverage/
 # Temporary folders
 tmp/
 temp/
+
+# Firebase CLI cache & deploy artifacts
+.firebase/
+firebase-debug.log
+
+# Claude Code workspace
+.claude/
+
+# Backup files (never commit — may contain old secrets)
+*.backup
+*.before-*
+
+# Local working folders / assets not meant for the repo
+/naver_rank_checker/
+/디자인/
+*.png
+!design-previews/**/*.png
