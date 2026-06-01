@@ -522,6 +522,15 @@ h1 {
     background-color: rgba(0, 0, 0, 0.5);
 }
 
+/* 오버레이 모달(.modal-overlay)도 화면 전체에 고정되어 중앙 영역에 뜨도록 */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    overflow-y: auto;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
 .modal-content {
     background-color: white;
     margin: 10% auto;

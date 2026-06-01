@@ -4368,6 +4368,10 @@ function renderRetiredList() {
                     <span>${hrData.department || '미설정'}</span>
                 </div>
                 <div class="hr-info-item">
+                    <span class="hr-info-label">직급:</span>
+                    <span>${hrData.position || '미설정'}</span>
+                </div>
+                <div class="hr-info-item">
                     <span class="hr-info-label">입사일:</span>
                     <span>${employee.joinDate}</span>
                 </div>
@@ -4380,9 +4384,19 @@ function renderRetiredList() {
                     <span>${years}년 ${months}개월</span>
                 </div>
                 <div class="hr-info-item">
+                    <span class="hr-info-label">연락처:</span>
+                    <span id="phone-${employee.id}">로딩중...</span>
+                </div>
+                <div class="hr-info-item">
                     <span class="hr-info-label">${yos < 1 ? '월차' : '연차'}:</span>
                     <span>${leaveLine}</span>
                 </div>
+                ${hrData.lastUpdated ? `
+                <div class="hr-info-item">
+                    <span class="hr-info-label">최종수정:</span>
+                    <span>${new Date(hrData.lastUpdated).toLocaleDateString('ko-KR')}</span>
+                </div>
+                ` : ''}
             </div>
             ${isAdmin ? `
             <div class="retired-actions">
@@ -4392,6 +4406,22 @@ function renderRetiredList() {
             ` : ''}
         `;
         container.appendChild(card);
+
+        // 연락처 비동기 복호화 및 표시 (재직 카드와 동일)
+        if (hrData.enc && hrData.enc.phone) {
+            aesDecrypt(hrData.enc.phone).then(phone => {
+                const phoneElement = document.getElementById(`phone-${employee.id}`);
+                if (phoneElement) {
+                    phoneElement.textContent = phone ? maskSensitiveData(phone, 'phone') : '미등록';
+                }
+            }).catch(() => {
+                const phoneElement = document.getElementById(`phone-${employee.id}`);
+                if (phoneElement) phoneElement.textContent = '복호화 실패';
+            });
+        } else {
+            const phoneElement = document.getElementById(`phone-${employee.id}`);
+            if (phoneElement) phoneElement.textContent = '미등록';
+        }
     });
 }
 
