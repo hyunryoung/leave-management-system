@@ -341,6 +341,56 @@ h1 {
     font-weight: bold;
 }
 
+/* HR 재직/퇴사자 목록 토글 */
+.hr-list-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.hr-list-tab {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color, #ddd);
+    background: var(--bg-secondary, #f8f9fa);
+    color: var(--text-secondary, #666);
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+}
+.hr-list-tab.active {
+    background: #667eea;
+    color: #ffffff;
+    border-color: #667eea;
+}
+.hr-employee-card.retired {
+    opacity: 0.85;
+    border-left: 3px solid #dc3545;
+}
+.retired-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+.retired-actions .btn-restore,
+.retired-actions .btn-permanent-delete {
+    flex: 1;
+    padding: 6px 10px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+}
+.retired-actions .btn-restore {
+    background: #28a745;
+    color: #fff;
+}
+.retired-actions .btn-permanent-delete {
+    background: #dc3545;
+    color: #fff;
+}
+
 .selected-info {
     background: #e3f2fd;
     padding: 10px;

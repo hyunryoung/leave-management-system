@@ -968,6 +968,13 @@ function getServiceDuration(joinDate, refDate = new Date()) {
     return { years: Math.floor(totalMonths / 12), months: totalMonths % 12 };
 }
 
+// 재직 여부: 퇴사일이 없거나 아직 안 지났으면 재직, 지난 퇴사일이면 퇴사
+function isEmployeeActive(employee) {
+    const ld = employee && employee.hrData && employee.hrData.leaveDate;
+    if (!ld) return true;
+    return new Date(ld) > new Date();
+}
+
 // 휴가 기록에서 직원별 사용량 계산 (데이터 동기화 보장)
 function calculateUsedLeavesFromRecords(employeeId, annualCycleStart = null) {
     let usedAnnual = 0;
@@ -1006,9 +1013,14 @@ function calculateUsedLeavesFromRecords(employeeId, annualCycleStart = null) {
 
 // 직원별 연차/월차 계산
 function calculateEmployeeLeaves(employee) {
-    const today = new Date();
+    const now = new Date();
     const joinDate = new Date(employee.joinDate);
-    
+
+    // 퇴사자는 퇴사일 기준으로 계산을 고정 (퇴사 후 근속연수/월차가 계속 늘지 않도록)
+    const leaveDateStr = employee.hrData && employee.hrData.leaveDate;
+    const leaveDateObj = leaveDateStr ? new Date(leaveDateStr) : null;
+    const today = (leaveDateObj && leaveDateObj < now) ? leaveDateObj : now;
+
     // 근무일수 (로그용) + 입사 기념일 기준 만 근속 연수
     const daysDiff = Math.floor((today - joinDate) / (1000 * 60 * 60 * 24));
     const yearsOfService = getYearsOfService(joinDate, today);
@@ -1151,6 +1163,7 @@ async function deleteEmployee(id) {
         // UI 업데이트
         renderEmployeeSummary();
         updateModalEmployeeDropdown();
+        renderHREmployeeList();
         renderCalendar();
     }
 }
@@ -1160,7 +1173,7 @@ function renderEmployeeSummary() {
     const container = document.getElementById('employeeSummary');
     container.innerHTML = '';
     
-    employees.forEach(employee => {
+    employees.filter(isEmployeeActive).forEach(employee => {
         const joinDate = new Date(employee.joinDate);
         const today = new Date();
         const { years, months } = getServiceDuration(joinDate, today);
@@ -1209,9 +1222,9 @@ function renderEmployeeSummary() {
             `;
         }
         
-        // 권한에 따른 삭제 버튼 표시
+        // 권한에 따른 퇴사 처리 버튼 표시 (X = 퇴사 처리, 영구삭제 아님)
         const deleteButton = checkPermission('admin') ? 
-            `<button class="delete-employee" onclick="deleteEmployee(${employee.id}); event.stopPropagation();">×</button>` : 
+            `<button class="delete-employee" title="퇴사 처리" onclick="openRetireModal(${employee.id}); event.stopPropagation();">×</button>` : 
             '';
         
         card.innerHTML = `
@@ -1380,7 +1393,7 @@ function updateModalEmployeeDropdown() {
     const dropdown = document.getElementById('modalEmployee');
     dropdown.innerHTML = '<option value="">직원 선택</option>';
     
-    employees.forEach(employee => {
+    employees.filter(isEmployeeActive).forEach(employee => {
         const option = document.createElement('option');
         option.value = employee.id;
         option.textContent = employee.name;
@@ -4212,13 +4225,15 @@ async function deleteEmployeeHRData() {
 function renderHREmployeeList() {
     const container = document.getElementById('hrEmployeeList');
     container.innerHTML = '';
-    
-    if (employees.length === 0) {
-        container.innerHTML = '<div style="text-align: center; padding: 40px; color: #6c757d;">등록된 직원이 없습니다.</div>';
-        return;
+
+    // 재직자만 표시 (퇴사자는 renderRetiredList에서)
+    const activeEmployees = employees.filter(isEmployeeActive);
+
+    if (activeEmployees.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: 40px; color: #6c757d;">재직 중인 직원이 없습니다.</div>';
     }
-    
-    employees.forEach(employee => {
+
+    activeEmployees.forEach(employee => {
         const card = document.createElement('div');
         card.className = 'hr-employee-card';
         
@@ -4298,6 +4313,230 @@ function renderHREmployeeList() {
             if (phoneElement) phoneElement.textContent = '미등록';
         }
     });
+
+    // 퇴사자 목록도 함께 갱신 (표시 여부는 switchHrListView가 제어)
+    renderRetiredList();
+}
+
+// 퇴사자 목록 렌더링
+function renderRetiredList() {
+    const container = document.getElementById('hrRetiredList');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const retired = employees.filter(emp => !isEmployeeActive(emp));
+
+    if (retired.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: 40px; color: #6c757d;">퇴사자가 없습니다.</div>';
+        return;
+    }
+
+    const isAdmin = checkPermission('admin');
+
+    // 퇴사일 최신순 정렬
+    retired.sort((a, b) => new Date(b.hrData.leaveDate) - new Date(a.hrData.leaveDate));
+
+    retired.forEach(employee => {
+        const hrData = employee.hrData || {};
+        const joinDate = new Date(employee.joinDate);
+        const leaveDate = new Date(hrData.leaveDate);
+        const { years, months } = getServiceDuration(joinDate, leaveDate);
+
+        // 퇴사 시점 기준 연차/월차 사용·잔여 (calculateEmployeeLeaves가 퇴사일로 고정 계산함)
+        const yos = getYearsOfService(joinDate, leaveDate);
+        let leaveLine;
+        if (yos < 1) {
+            const used = employee.usedMonthly || 0;
+            const total = employee.monthlyLeave || 0;
+            leaveLine = `월차 ${used} / ${total}개 사용 (잔여 ${(total - used).toFixed(1)}개)`;
+        } else {
+            const used = employee.usedAnnual || 0;
+            const total = employee.annualLeave || 0;
+            leaveLine = `연차 ${used} / ${total}일 사용 (잔여 ${(total - used).toFixed(1)}일)`;
+        }
+
+        const card = document.createElement('div');
+        card.className = 'hr-employee-card retired';
+        card.innerHTML = `
+            <div class="hr-employee-name">
+                ${employee.name}
+                <span style="font-size: 0.8rem; color: #dc3545;">퇴사</span>
+            </div>
+            <div class="hr-employee-info">
+                <div class="hr-info-item">
+                    <span class="hr-info-label">부서:</span>
+                    <span>${hrData.department || '미설정'}</span>
+                </div>
+                <div class="hr-info-item">
+                    <span class="hr-info-label">입사일:</span>
+                    <span>${employee.joinDate}</span>
+                </div>
+                <div class="hr-info-item">
+                    <span class="hr-info-label">퇴사일:</span>
+                    <span>${hrData.leaveDate}</span>
+                </div>
+                <div class="hr-info-item">
+                    <span class="hr-info-label">총 근무기간:</span>
+                    <span>${years}년 ${months}개월</span>
+                </div>
+                <div class="hr-info-item">
+                    <span class="hr-info-label">${yos < 1 ? '월차' : '연차'}:</span>
+                    <span>${leaveLine}</span>
+                </div>
+            </div>
+            ${isAdmin ? `
+            <div class="retired-actions">
+                <button class="btn-restore" onclick="restoreEmployee(${employee.id})">복직</button>
+                <button class="btn-permanent-delete" onclick="deleteEmployee(${employee.id})">영구 삭제</button>
+            </div>
+            ` : ''}
+        `;
+        container.appendChild(card);
+    });
+}
+
+// 재직/퇴사 목록 전환
+function switchHrListView(view) {
+    const activeList = document.getElementById('hrEmployeeList');
+    const retiredList = document.getElementById('hrRetiredList');
+    const tabActive = document.getElementById('hrTabActive');
+    const tabRetired = document.getElementById('hrTabRetired');
+    if (!activeList || !retiredList) return;
+
+    if (view === 'retired') {
+        activeList.style.display = 'none';
+        retiredList.style.display = 'block';
+        tabActive && tabActive.classList.remove('active');
+        tabRetired && tabRetired.classList.add('active');
+    } else {
+        activeList.style.display = 'block';
+        retiredList.style.display = 'none';
+        tabActive && tabActive.classList.add('active');
+        tabRetired && tabRetired.classList.remove('active');
+    }
+}
+
+// ===== 퇴사 처리 =====
+function openRetireModal(id) {
+    if (!checkPermission('admin')) {
+        showNoPermissionAlert('퇴사 처리');
+        return;
+    }
+    const employee = employees.find(emp => emp.id === id);
+    if (!employee) return;
+
+    const modal = document.getElementById('retireEmployeeModal');
+    if (!modal) return;
+    modal.dataset.employeeId = id;
+    document.getElementById('retireEmployeeName').textContent = employee.name;
+    // 기본값: 오늘
+    document.getElementById('retireDate').value = new Date().toISOString().split('T')[0];
+    modal.style.cssText = 'display: block !important; z-index: 10000 !important;';
+}
+
+function closeRetireModal() {
+    const modal = document.getElementById('retireEmployeeModal');
+    if (!modal) return;
+    modal.style.display = 'none';
+    delete modal.dataset.employeeId;
+}
+
+async function confirmRetire() {
+    const modal = document.getElementById('retireEmployeeModal');
+    const id = parseInt(modal.dataset.employeeId);
+    const employee = employees.find(emp => emp.id === id);
+    if (!employee) return;
+
+    const retireDate = document.getElementById('retireDate').value;
+    if (!retireDate) {
+        alert('퇴사일을 기입해주세요.');
+        return;
+    }
+    if (new Date(retireDate) < new Date(employee.joinDate)) {
+        alert('퇴사일은 입사일보다 빠를 수 없습니다.');
+        return;
+    }
+
+    // 퇴사일 기록 + 휴가/연차 계산을 퇴사일 기준으로 고정
+    employee.hrData = employee.hrData || {};
+    employee.hrData.leaveDate = retireDate;
+    employee.hrData.lastUpdated = new Date().toISOString();
+    clearLeaveCache();
+    calculateEmployeeLeaves(employee);
+
+    let saveOk = true;
+    if (isFirebaseEnabled && firebase.auth().currentUser) {
+        bumpPendingWrites();
+        try {
+            await saveEmployee(employee);
+        } catch (err) {
+            saveOk = false;
+            console.error('퇴사 처리 저장 실패:', err);
+        } finally {
+            dropPendingWrites();
+        }
+    }
+
+    if (!saveOk) {
+        // 롤백
+        delete employee.hrData.leaveDate;
+        clearLeaveCache();
+        calculateEmployeeLeaves(employee);
+        showToast('error', '퇴사 처리 실패', '저장에 실패했습니다. 다시 시도해주세요.');
+        return;
+    }
+
+    closeRetireModal();
+    renderEmployeeSummary();
+    updateModalEmployeeDropdown();
+    renderHREmployeeList();
+    renderCalendar();
+    showToast('success', '퇴사 처리 완료', `${employee.name} 님이 퇴사 처리되었습니다.`);
+}
+
+// 복직 (퇴사 취소)
+async function restoreEmployee(id) {
+    if (!checkPermission('admin')) {
+        showNoPermissionAlert('복직 처리');
+        return;
+    }
+    const employee = employees.find(emp => emp.id === id);
+    if (!employee || !employee.hrData) return;
+
+    if (!confirm(`${employee.name} 님을 복직 처리하시겠습니까?`)) return;
+
+    const backupLeaveDate = employee.hrData.leaveDate;
+    delete employee.hrData.leaveDate;
+    employee.hrData.lastUpdated = new Date().toISOString();
+    clearLeaveCache();
+    calculateEmployeeLeaves(employee);
+
+    let saveOk = true;
+    if (isFirebaseEnabled && firebase.auth().currentUser) {
+        bumpPendingWrites();
+        try {
+            await saveEmployee(employee);
+        } catch (err) {
+            saveOk = false;
+            console.error('복직 처리 저장 실패:', err);
+        } finally {
+            dropPendingWrites();
+        }
+    }
+
+    if (!saveOk) {
+        employee.hrData.leaveDate = backupLeaveDate;
+        clearLeaveCache();
+        calculateEmployeeLeaves(employee);
+        showToast('error', '복직 처리 실패', '저장에 실패했습니다. 다시 시도해주세요.');
+        return;
+    }
+
+    renderEmployeeSummary();
+    updateModalEmployeeDropdown();
+    renderHREmployeeList();
+    renderCalendar();
+    showToast('success', '복직 완료', `${employee.name} 님이 재직 상태로 돌아왔습니다.`);
 }
 
 // HR 직원 목록 필터링

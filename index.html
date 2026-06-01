@@ -336,11 +336,15 @@
 
                     <!-- HR 직원 목록 -->
                     <div class="hr-list-section">
-                        <h3>직원 목록</h3>
+                        <div class="hr-list-tabs">
+                            <button class="hr-list-tab active" id="hrTabActive" onclick="switchHrListView('active')">직원 목록</button>
+                            <button class="hr-list-tab" id="hrTabRetired" onclick="switchHrListView('retired')">퇴사자</button>
+                        </div>
                         <div class="hr-search">
                             <input type="text" id="hrSearchInput" placeholder="이름, 부서, 직급으로 검색..." onkeyup="filterHRList()">
                         </div>
                         <div class="hr-employee-list" id="hrEmployeeList"></div>
+                        <div class="hr-employee-list" id="hrRetiredList" style="display:none;"></div>
                     </div>
                     <!-- Slack 설정 섹션 -->
                     <div class="hr-form-section" style="margin-top: 30px; border-top: 2px solid #e0e0e0; padding-top: 20px;">
@@ -505,6 +509,23 @@
                 <button onclick="confirmApproveApiKey()">승인</button>
                 <button onclick="rejectApiKey()">거절</button>
                 <button onclick="closeApikeyApproveModal()">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 퇴사 처리 모달 -->
+    <div class="modal-overlay" id="retireEmployeeModal" style="display:none;">
+        <div class="modal-content" style="max-width:420px;">
+            <h3>퇴사 처리</h3>
+            <p style="color:#666; margin:10px 0;"><strong id="retireEmployeeName"></strong> 님을 퇴사 처리합니다.<br>퇴사일을 기입해주세요.</p>
+            <div class="form-group">
+                <label>퇴사일:</label>
+                <input type="date" id="retireDate">
+            </div>
+            <p style="color:#999; font-size:12px; margin-top:8px;">※ 휴가 기록은 보존되며, 퇴사자 탭에서 조회·복직할 수 있습니다.</p>
+            <div class="modal-buttons">
+                <button onclick="confirmRetire()">퇴사 처리</button>
+                <button onclick="closeRetireModal()">취소</button>
             </div>
         </div>
     </div>
