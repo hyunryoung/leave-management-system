@@ -4400,12 +4400,21 @@ function renderRetiredList() {
             </div>
             ${isAdmin ? `
             <div class="retired-actions">
-                <button class="btn-restore" onclick="restoreEmployee(${employee.id})">복직</button>
-                <button class="btn-permanent-delete" onclick="deleteEmployee(${employee.id})">영구 삭제</button>
+                <button class="btn-restore" onclick="event.stopPropagation(); restoreEmployee(${employee.id})">복직</button>
+                <button class="btn-permanent-delete" onclick="event.stopPropagation(); deleteEmployee(${employee.id})">영구 삭제</button>
             </div>
             ` : ''}
         `;
         container.appendChild(card);
+
+        // 카드 클릭 시 HR 폼에 로드 (전체 연락처 등 상세 확인용)
+        card.style.cursor = 'pointer';
+        card.addEventListener('click', () => {
+            document.getElementById('hrEmployeeSelect').value = employee.id;
+            loadEmployeeHRData();
+            const formSection = document.querySelector('.hr-form-section');
+            if (formSection) formSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
 
         // 연락처 비동기 복호화 및 표시 (재직 카드와 동일)
         if (hrData.enc && hrData.enc.phone) {
