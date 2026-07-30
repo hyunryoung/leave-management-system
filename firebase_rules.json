@@ -23,17 +23,17 @@
 
     "employees": {
       ".read":  "auth != null && root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('status').val() === 'active'",
-      ".write": "auth != null && root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('status').val() === 'active'"
+      ".write": "auth != null && (auth.token.email === 'shr941207@gmail.com' || (root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('status').val() === 'active' && (root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('role').val() === 'admin' || root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('role').val() === 'manager')))"
     },
 
     "leaveRecords": {
       ".read":  "auth != null && root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('status').val() === 'active'",
-      ".write": "auth != null && root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('status').val() === 'active'"
+      ".write": "auth != null && (auth.token.email === 'shr941207@gmail.com' || (root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('status').val() === 'active' && (root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('role').val() === 'admin' || root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('role').val() === 'manager')))"
     },
 
     "overtimeRecords": {
       ".read":  "auth != null && root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('status').val() === 'active'",
-      ".write": "auth != null && root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('status').val() === 'active'"
+      ".write": "auth != null && (auth.token.email === 'shr941207@gmail.com' || (root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('status').val() === 'active' && (root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('role').val() === 'admin' || root.child('authorized_users').child(auth.token.email.toLowerCase().replace('.', '_dot_').replace('@', '_at_')).child('role').val() === 'manager')))"
     },
 
     "tokens": {
